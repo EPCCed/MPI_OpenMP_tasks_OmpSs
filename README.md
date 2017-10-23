@@ -1,1 +1,1 @@
-# MPI_OpenMP_tasks
+# MPI_OpenMP_tasks_OmpSs
