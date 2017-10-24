@@ -10,11 +10,8 @@ STEPS:
 	Edit the file default.mk and complet the corresponding directories with your paths
 
 - To make:
-	export CC = mpicc -fopenmp (for OpenMPI, MPICH)
-	export F77 = mpifort -fopenmp (for OpenMPI, MPICH)
-	OR
-	export CC = mpiicc -qopenmp (for IMPI)
-	export F77 = mpiifort -qopenmp (for IMPI)
+	export CC = mpicc 
+	export F77 = mpifort 
 	
 	./COMPILE.sh
 
