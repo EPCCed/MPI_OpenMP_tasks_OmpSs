@@ -21,14 +21,13 @@ LIBRARY_MPI = -L$(LIB_MPI) -lmpi
 
 ################################
 
-CC      = mcc --ompss-v2 -keep --debug --no-copy-deps #openmp-compatibility
-F77     = mfc --ompss-v2 -keep --debug --no-copy-deps #openmp-compatibility
+CC      = mcc --ompss-v2 -keep --debug --no-copy-deps 
+F77     = mfc --ompss-v2 -keep --debug --no-copy-deps 
 
 CFLAGS  = -Wall -g -fPIC -fno-stack-protector -D_ILU0_ -D_PARDISO_MATCHING_ -D__UNDERSCORE__ -D_DOUBLE_REAL_ $(INCLUDE_SHARED) -I$(INC_MPI) 
-CLINKER = mcc --ompss-v2 -keep --debug #--openmp-compatibility
-FLINKER = mfc --ompss-v2 -keep --debug #--openmp-compatibility
+CLINKER = mcc --ompss-v2 -keep --debug 
+FLINKER = mfc --ompss-v2 -keep --debug 
 LDFLAGS = --Wl,-nofor-main --no-copy-deps
-#LDFLAGS = --Wl,-nofor-main --no-copy-deps
 LDFLAGS = --no-copy-deps
 
 LIBLIST = $(LIBRARY_SHARED) $(LIBRARY_MPI)
