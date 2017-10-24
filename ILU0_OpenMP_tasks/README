@@ -1,0 +1,38 @@
+STEPS:
+
+- Previous:
+	
+	- Install GCC equal or greater than 4.9, or ICC 15.0
+	- Install MPI library (impi recommended)
+
+- To configure:
+
+	Edit the file default.mk and complet the corresponding directories with your paths
+
+- To make:
+	export CC = mpicc -fopenmp (for OpenMPI, MPICH)
+	export F77 = mpifort -fopenmp (for OpenMPI, MPICH)
+	OR
+	export CC = mpiicc -qopenmp (for IMPI)
+	export F77 = mpiifort -qopenmp (for IMPI)
+	
+	./COMPILE.sh
+
+- To execute:
+
+	1. Enter in the src directory
+	2. Edit the script EXEC.sh depending on your MPI version. 
+	2. Run the script EXEC.sh with the following parameters
+			a) num_proc_mpi: The number of mpi processes 
+			b) num_proc_ompss: The number of ompss threads
+			c) leaves: The number of leaves of the dependency tree computed in the program. We recommend that the number of leaves will be equal or greater than the number of total threads (mpi*ompss) 
+			d) matrix: The matrix to be processed. You can choose a small matrix (A100.rsa) or a big matrix (A318.rsa)
+
+			./EXEC.sh num_proc_mpi num_proc_ompss leaves matrix 
+			
+			Examples: ./EXEC.sh 4 2 8 ../../Matrices/A100.rsa
+				  ./EXEC.sh 4 2 16 ../../Matrices/A318.rsa
+
+- To verify:
+	If the execution finishes the result will be right
+ 
