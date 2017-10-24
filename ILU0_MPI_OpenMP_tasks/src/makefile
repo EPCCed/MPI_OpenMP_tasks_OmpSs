@@ -21,8 +21,6 @@ LIBRARY_MPI = -L$(LIB_MPI) -lmpi
 
 ################################
 
-#CC      = mpicc -fopenmp
-#F77     = mpifort -fopenmp
 ifeq ($(CC),mpicc)
         OPENMP=-fopenmp
 else
