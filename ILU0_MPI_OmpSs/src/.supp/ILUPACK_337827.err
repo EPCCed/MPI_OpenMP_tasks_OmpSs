@@ -1,0 +1,3 @@
+load ompss/git (PATH): OmpSs git - nanox 0.14a, mcxx 2.1.0 
+load openmpi/1.10.4 (PATH, MANPATH, LD_LIBRARY_PATH) 
+mpirun: error while loading shared libraries: libimf.so: cannot open shared object file: No such file or directory
