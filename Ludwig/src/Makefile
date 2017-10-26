@@ -37,6 +37,7 @@ LIBRARY = libludwig.a
 OPTS = -DNP_D3Q6 -DTASKS
 LIBS = -L../targetDP -ltarget -lm
 INC = -I. -I ../targetDP
+CFLAGS = -qopenmp
 
 ifeq ($(strip $(OPTION)),reveal_libgen)
  	OPTS += -h pl=ludwiglib.pl
@@ -130,7 +131,7 @@ verbose:
             "\t Check the Makefile for further details\n"	
 
 code:	$(MAIN).o
-	$(CC) $(LDFLAGS) -o $(EXECUTABLE) $(MAIN).o $(LIBRARY) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(EXECUTABLE) $(MAIN).o $(LIBRARY) $(LIBS)
 
 # Serial versions
 

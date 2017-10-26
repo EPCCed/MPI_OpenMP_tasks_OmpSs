@@ -305,7 +305,7 @@ __targetEntry__  void lb_propagate_d3q19_lattice(lb_t* t_lb)
   for(baseIndex=0; baseIndex < tc_nSites; baseIndex+=BLOCK){
     
 #pragma omp task default(none) shared(t_lb,tc_nSites,BLOCK) private(i)	\
-  firstprivate(baseIndex) depend (in:t_lb->f,t_lb->tcopy->f,t_lb->fprime)
+  firstprivate(baseIndex) depend (in:t_lb)
     {
       for (i=baseIndex;i < baseIndex + BLOCK; i+=VVL){
 	lb_propagate_d3q19_site (t_lb->f,t_lb->fprime, i);

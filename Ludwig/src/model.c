@@ -1610,13 +1610,13 @@ int lb_halo_via_copy_nonblocking_start(lb_t * lb) {
      12 neighbouring edges
      8 neighbouring corners */
 
-#pragma omp task depend(out:lb->hl.recvreq[0:5],lb->hl.sendreq[0:5])
+  //#pragma omp task depend(out:lb->hl.recvreq[0:5],lb->hl.sendreq[0:5])
   halo_planes(lb);
   
-#pragma omp task depend(out:lb->hl.recvreq[6:17],lb->hl.sendreq[6:17])
+  //#pragma omp task depend(out:lb->hl.recvreq[6:17],lb->hl.sendreq[6:17])
   halo_edges(lb);
   
-#pragma omp task depend(out:lb->hl.recvreq[18:25],lb->hl.sendreq[18:25])
+  //#pragma omp task depend(out:lb->hl.recvreq[18:25],lb->hl.sendreq[18:25])
   halo_corners(lb);
   
   //#pragma omp taskwait
@@ -1631,17 +1631,17 @@ int lb_halo_via_copy_nonblocking_end(lb_t * lb) {
   int sendcount;
 
   for (n=0; n<26; n++){
-#pragma omp task depend (inout:lb->hl.recvreq[0:25]) 
+    //#pragma omp task depend (inout:lb->hl.recvreq[0:25]) 
     MPI_Waitany(26, lb->hl.recvreq, &recvcount, lb->hl.status);
   }
   //#pragma omp taskwait
 
   /* Copy data from MPI buffers */
-#pragma omp task depend (in: lb->hl.recvreq[0:25])
+  //#pragma omp task depend (in: lb->hl.recvreq[0:25])
   unpack_halo_buffers(lb);
   
   for (n=0; n<26; n++){
-#pragma omp task depend (in:lb->hl.sendreq[0:25])
+    //#pragma omp task depend (in:lb->hl.sendreq[0:25])
     MPI_Waitany(26, lb->hl.sendreq, &sendcount, lb->hl.status);
   }
 

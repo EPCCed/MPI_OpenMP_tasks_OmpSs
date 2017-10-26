@@ -78,7 +78,7 @@ int lb_halo_via_copy_nonblocking_tasks_end(lb_t * lb) {
   //#pragma omp task depend (in: lb->hl.recvreq[0:25])
   for (n=0; n<26; n++){
 #pragma omp task default(none) shared(lb)firstprivate(n)   \
-  depend(out:lb->hl.recvreq[id])
+  depend(out:lb->hl.recvreq[n])
     unpack_halo_buffers_i(lb,n);
   }
   
