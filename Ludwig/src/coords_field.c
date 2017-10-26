@@ -106,7 +106,7 @@ int coords_field_index(int index, int n, int nf, int * indexf) {
  *****************************************************************************/
 
 int coords_field_init_mpi_indexed(int nhcomm, int nf, MPI_Datatype mpidata,
-                                  MPI_Datatype halo[3]) {
+				  MPI_Datatype halo[3]) {
 
   int ic, jc, n;
   int nhalo;
@@ -303,16 +303,16 @@ int coords_field_halo_d(int nhcomm, int nf, double * f, MPI_Datatype halo[3]) {
   else {
     for (nh = 0; nh < nhcomm; nh++) {
       for (jc = 1; jc <= nlocal[Y]; jc++) {
-        for (kc = 1; kc <= nlocal[Z]; kc++) {
-          for (n = 0; n < nf; n++) {
-            ihalo = n + nf*coords_index(0 - nh, jc, kc);
-            ireal = n + nf*coords_index(nlocal[X] - nh, jc, kc);
-            f[ihalo] = f[ireal];
-            ihalo = n + nf*coords_index(nlocal[X] + 1 + nh, jc, kc);
-            ireal = n + nf*coords_index(1 + nh, jc, kc);
-            f[ihalo] = f[ireal];
-          }
-        }
+	for (kc = 1; kc <= nlocal[Z]; kc++) {
+	  for (n = 0; n < nf; n++) {
+	    ihalo = n + nf*coords_index(0 - nh, jc, kc);
+	    ireal = n + nf*coords_index(nlocal[X] - nh, jc, kc);
+	    f[ihalo] = f[ireal];
+	    ihalo = n + nf*coords_index(nlocal[X] + 1 + nh, jc, kc);
+	    ireal = n + nf*coords_index(1 + nh, jc, kc);
+	    f[ihalo] = f[ireal];
+	  }
+	}
       }
     }
   }
@@ -331,16 +331,16 @@ int coords_field_halo_d(int nhcomm, int nf, double * f, MPI_Datatype halo[3]) {
   else {
     for (nh = 0; nh < nhcomm; nh++) {
       for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-        for (kc = 1; kc <= nlocal[Z]; kc++) {
-          for (n = 0; n < nf; n++) {
-            ihalo = n + nf*coords_index(ic, 0 - nh, kc);
-            ireal = n + nf*coords_index(ic, nlocal[Y] - nh, kc);
-            f[ihalo] = f[ireal];
-            ihalo = n + nf*coords_index(ic, nlocal[Y] + 1 + nh, kc);
-            ireal = n + nf*coords_index(ic, 1 + nh, kc);
-            f[ihalo] = f[ireal];
-          }
-        }
+	for (kc = 1; kc <= nlocal[Z]; kc++) {
+	  for (n = 0; n < nf; n++) {
+	    ihalo = n + nf*coords_index(ic, 0 - nh, kc);
+	    ireal = n + nf*coords_index(ic, nlocal[Y] - nh, kc);
+	    f[ihalo] = f[ireal];
+	    ihalo = n + nf*coords_index(ic, nlocal[Y] + 1 + nh, kc);
+	    ireal = n + nf*coords_index(ic, 1 + nh, kc);
+	    f[ihalo] = f[ireal];
+	  }
+	}
       }
     }
   }
@@ -359,16 +359,16 @@ int coords_field_halo_d(int nhcomm, int nf, double * f, MPI_Datatype halo[3]) {
   else {
     for (nh = 0; nh < nhcomm; nh++) {
       for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-        for (jc = 1 - nhcomm; jc <= nlocal[Y] + nhcomm; jc++) {
-          for (n = 0; n < nf; n++) {
-            ihalo = n + nf*coords_index(ic, jc, 0 - nh);
-            ireal = n + nf*coords_index(ic, jc, nlocal[Z] - nh);
-            f[ihalo] = f[ireal];
-            ihalo = n + nf*coords_index(ic, jc, nlocal[Z] + 1 + nh);
-            ireal = n + nf*coords_index(ic, jc, 1 + nh);
-            f[ihalo] = f[ireal];
-          }
-        }
+	for (jc = 1 - nhcomm; jc <= nlocal[Y] + nhcomm; jc++) {
+	  for (n = 0; n < nf; n++) {
+	    ihalo = n + nf*coords_index(ic, jc, 0 - nh);
+	    ireal = n + nf*coords_index(ic, jc, nlocal[Z] - nh);
+	    f[ihalo] = f[ireal];
+	    ihalo = n + nf*coords_index(ic, jc, nlocal[Z] + 1 + nh);
+	    ireal = n + nf*coords_index(ic, jc, 1 + nh);
+	    f[ihalo] = f[ireal];
+	  }
+	}
       }
     }
   }
@@ -389,7 +389,7 @@ int coords_field_halo_d(int nhcomm, int nf, double * f, MPI_Datatype halo[3]) {
  *****************************************************************************/
 
 int coords_field_halo(int nhcomm, int nf, void * buf, MPI_Datatype mpidata,
-                      MPI_Datatype halo[3]) {
+		      MPI_Datatype halo[3]) {
 
   int nlocal[3];
   int ic, jc, kc, ihalo, ireal;
@@ -412,7 +412,7 @@ int coords_field_halo(int nhcomm, int nf, void * buf, MPI_Datatype mpidata,
 
   if (mpidata == MPI_CHAR) sz = sizeof(char);
   if (mpidata == MPI_DOUBLE) sz = sizeof(double);
-  
+
   coords_nlocal(nlocal);
   comm = cart_comm();
 
@@ -448,35 +448,32 @@ int coords_field_halo(int nhcomm, int nf, void * buf, MPI_Datatype mpidata,
     MPI_Irecv(mbuf + ihalo, 1, halo[Z], pforw, btagz, comm, req_recv + 4);
     ihalo = sz*nf*coords_index(1 - nhcomm, 1 - nhcomm, 1 - nhcomm);
     MPI_Irecv(mbuf + ihalo, 1, halo[Z], pback, ftagz, comm, req_recv + 5);
-
   }
 
 
   /* X sends */
 
   if (cart_size(X) > 1) {
-
     pback = cart_neighb(BACKWARD, X);
     pforw = cart_neighb(FORWARD, X);
     ireal = sz*nf*coords_index(1, 1, 1);
     MPI_Issend(mbuf + ireal, 1, halo[X], pback, btagx, comm, req_send);
     ireal = sz*nf*coords_index(nlocal[X] - nhcomm + 1, 1, 1);
     MPI_Issend(mbuf + ireal, 1, halo[X], pforw, ftagx, comm, req_send + 1);
-
   }
   else {
     for (nh = 0; nh < nhcomm; nh++) {
       for (jc = 1; jc <= nlocal[Y]; jc++) {
-        for (kc = 1; kc <= nlocal[Z]; kc++) {
-          for (n = 0; n < nf; n++) {
-            ihalo = n + nf*coords_index(0 - nh, jc, kc);
-            ireal = n + nf*coords_index(nlocal[X] - nh, jc, kc);
-            memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
-            ihalo = n + nf*coords_index(nlocal[X] + 1 + nh, jc, kc);
-            ireal = n + nf*coords_index(1 + nh, jc, kc);
-            memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
-          }
-        }
+	for (kc = 1; kc <= nlocal[Z]; kc++) {
+	  for (n = 0; n < nf; n++) {
+	    ihalo = n + nf*coords_index(0 - nh, jc, kc);
+	    ireal = n + nf*coords_index(nlocal[X] - nh, jc, kc);
+	    memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
+	    ihalo = n + nf*coords_index(nlocal[X] + 1 + nh, jc, kc);
+	    ireal = n + nf*coords_index(1 + nh, jc, kc);
+	    memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
+	  }
+	}
       }
     }
   }
@@ -495,16 +492,16 @@ int coords_field_halo(int nhcomm, int nf, void * buf, MPI_Datatype mpidata,
   else {
     for (nh = 0; nh < nhcomm; nh++) {
       for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-        for (kc = 1; kc <= nlocal[Z]; kc++) {
-          for (n = 0; n < nf; n++) {
-            ihalo = n + nf*coords_index(ic, 0 - nh, kc);
-            ireal = n + nf*coords_index(ic, nlocal[Y] - nh, kc);
-            memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
-            ihalo = n + nf*coords_index(ic, nlocal[Y] + 1 + nh, kc);
-            ireal = n + nf*coords_index(ic, 1 + nh, kc);
-            memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
-          }
-        }
+	for (kc = 1; kc <= nlocal[Z]; kc++) {
+	  for (n = 0; n < nf; n++) {
+	    ihalo = n + nf*coords_index(ic, 0 - nh, kc);
+	    ireal = n + nf*coords_index(ic, nlocal[Y] - nh, kc);
+	    memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
+	    ihalo = n + nf*coords_index(ic, nlocal[Y] + 1 + nh, kc);
+	    ireal = n + nf*coords_index(ic, 1 + nh, kc);
+	    memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
+	  }
+	}
       }
     }
   }
@@ -523,16 +520,16 @@ int coords_field_halo(int nhcomm, int nf, void * buf, MPI_Datatype mpidata,
   else {
     for (nh = 0; nh < nhcomm; nh++) {
       for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-        for (jc = 1 - nhcomm; jc <= nlocal[Y] + nhcomm; jc++) {
-          for (n = 0; n < nf; n++) {
-            ihalo = n + nf*coords_index(ic, jc, 0 - nh);
-            ireal = n + nf*coords_index(ic, jc, nlocal[Z] - nh);
-            memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
-            ihalo = n + nf*coords_index(ic, jc, nlocal[Z] + 1 + nh);
-            ireal = n + nf*coords_index(ic, jc, 1 + nh);
-            memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
-          }
-        }
+	for (jc = 1 - nhcomm; jc <= nlocal[Y] + nhcomm; jc++) {
+	  for (n = 0; n < nf; n++) {
+	    ihalo = n + nf*coords_index(ic, jc, 0 - nh);
+	    ireal = n + nf*coords_index(ic, jc, nlocal[Z] - nh);
+	    memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
+	    ihalo = n + nf*coords_index(ic, jc, nlocal[Z] + 1 + nh);
+	    ireal = n + nf*coords_index(ic, jc, 1 + nh);
+	    memcpy(mbuf + sz*ihalo, mbuf + sz*ireal, sz);
+	  }
+	}
       }
     }
   }
@@ -540,589 +537,6 @@ int coords_field_halo(int nhcomm, int nf, void * buf, MPI_Datatype mpidata,
   /* Finish */
   MPI_Waitall(2, req_recv + 4, status);
   MPI_Waitall(6, req_send, status);
-
-  return 0;
-}
-/*****************************************************************************
- *
- *  coords_field_halo_rank1
- *
- *****************************************************************************/
-
-int coords_field_halo_rank1(int nall, int nhcomm, int na, void * mbuf,
-			    MPI_Datatype mpidata) {
-  int sz;
-  int ic, jc, kc;
-  int ia, index;
-  int nh;
-  int ireal, ihalo;
-  int icount, nsend;
-  int pforw, pback;
-  int nlocal[3];
-
-  unsigned char * buf;
-  unsigned char * sendforw;
-  unsigned char * sendback;
-  unsigned char * recvforw;
-  unsigned char * recvback;
-
-  MPI_Comm comm;
-  MPI_Request req[4];
-  MPI_Status status[2];
-
-  const int tagf = 2015;
-  const int tagb = 2016;
-
-  assert(mbuf);
-  assert(mpidata == MPI_CHAR || mpidata == MPI_DOUBLE);
-
-  buf = (unsigned char *) mbuf;
-
-  comm = cart_comm();
-  if (mpidata == MPI_CHAR) sz = sizeof(char);
-  if (mpidata == MPI_DOUBLE) sz = sizeof(double);
-
-  coords_nlocal(nlocal);
-
-  /* X-direction */
-
-  nsend = nhcomm*na*nlocal[Y]*nlocal[Z];
-  sendforw = (unsigned char *) malloc(nsend*sz);
-  sendback = (unsigned char *) malloc(nsend*sz);
-  recvforw = (unsigned char *) malloc(nsend*sz);
-  recvback = (unsigned char *) malloc(nsend*sz);
-  if (sendforw == NULL) fatal("malloc(sendforw) failed\n");
-  if (sendback == NULL) fatal("malloc(sendback) failed\n");
-  if (recvforw == NULL) fatal("malloc(recvforw) failed\n");
-  if (recvback == NULL) fatal("malloc(recvback) failed\n");
-
-  /* Load send buffers */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (jc = 1; jc <= nlocal[Y]; jc++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
-	for (ia = 0; ia < na; ia++) {
-	  /* Backward going... */
-	  index = coords_index(1 + nh, jc, kc);
-	  //ireal = addr_rank1(nall, na, index, ia);
-	  memcpy(sendback + icount*sz, buf + ireal*sz, sz);
-	  /* ...and forward going. */
-	  index = coords_index(nlocal[X] - nh, jc, kc);
-	  //ireal = addr_rank1(nall, na, index, ia);
-	  memcpy(sendforw + icount*sz, buf + ireal*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  if (cart_size(X) == 1) {
-    memcpy(recvback, sendforw, nsend*sz);
-    memcpy(recvforw, sendback, nsend*sz);
-    req[2] = MPI_REQUEST_NULL;
-    req[3] = MPI_REQUEST_NULL;
-  }
-  else {
-    pforw = cart_neighb(FORWARD, X);
-    pback = cart_neighb(BACKWARD, X);
-    MPI_Irecv(recvforw, nsend, mpidata, pforw, tagb, comm, req);
-    MPI_Irecv(recvback, nsend, mpidata, pback, tagf, comm, req + 1);
-    MPI_Issend(sendback, nsend, mpidata, pback, tagb, comm, req + 2);
-    MPI_Issend(sendforw, nsend, mpidata, pforw, tagf, comm, req + 3);
-    /* Wait for receives */
-    MPI_Waitall(2, req, status);
-  }
-
-  /* Unload */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (jc = 1; jc <= nlocal[Y]; jc++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
-	for (ia = 0; ia < na; ia++) {
-	  index = coords_index(nlocal[X] + 1 + nh, jc, kc);
-	  //ihalo = addr_rank1(nall, na, index, ia);
-	  memcpy(buf + ihalo*sz, recvforw + icount*sz, sz);
-	  index = coords_index(0 - nh, jc, kc);
-	  //ihalo = addr_rank1(nall, na, index, ia);
-	  memcpy(buf + ihalo*sz, recvback + icount*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  free(recvback);
-  free(recvforw);
-
-  MPI_Waitall(2, req + 2, status);
-
-  free(sendback);
-  free(sendforw);
-
-  /* Y direction */
-
-  nsend = nhcomm*na*(nlocal[X] + 2*nhcomm)*nlocal[Z];
-  sendforw = (unsigned char *) malloc(nsend*sz);
-  sendback = (unsigned char *) malloc(nsend*sz);
-  recvforw = (unsigned char *) malloc(nsend*sz);
-  recvback = (unsigned char *) malloc(nsend*sz);
-  if (sendforw == NULL) fatal("malloc(sendforw) failed\n");
-  if (sendback == NULL) fatal("malloc(sendback) failed\n");
-  if (recvforw == NULL) fatal("malloc(recvforw) failed\n");
-  if (recvback == NULL) fatal("malloc(recvback) failed\n");
-
-  /* Load buffers */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
-	for (ia = 0; ia < na; ia++) {
-	  index = coords_index(ic, 1 + nh, kc);
-	  //ireal = addr_rank1(nall, na, index, ia);
-	  memcpy(sendback + icount*sz, buf + ireal*sz, sz);
-	  index = coords_index(ic, nlocal[Y] - nh, kc);
-	  //ireal = addr_rank1(nall, na, index, ia);
-	  memcpy(sendforw + icount*sz, buf + ireal*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  if (cart_size(Y) == 1) {
-    memcpy(recvback, sendforw, nsend*sz);
-    memcpy(recvforw, sendback, nsend*sz);
-    req[2] = MPI_REQUEST_NULL;
-    req[3] = MPI_REQUEST_NULL;
-  }
-  else {
-    pforw = cart_neighb(FORWARD, Y);
-    pback = cart_neighb(BACKWARD, Y);
-    MPI_Irecv(recvforw, nsend, mpidata, pforw, tagb, comm, req);
-    MPI_Irecv(recvback, nsend, mpidata, pback, tagf, comm, req + 1);
-    MPI_Issend(sendback, nsend, mpidata, pback, tagb, comm, req + 2);
-    MPI_Issend(sendforw, nsend, mpidata, pforw, tagf, comm, req + 3);
-    /* Wait for receives */
-    MPI_Waitall(2, req, status);
-  }
-
-  /* Unload */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
-	for (ia = 0; ia < na; ia++) {
-	  index = coords_index(ic, 0 - nh, kc);
-	  //ihalo = addr_rank1(nall, na, index, ia);
-	  memcpy(buf + ihalo*sz, recvback + icount*sz, sz);
-	  index = coords_index(ic, nlocal[Y] + 1 + nh, kc);
-	  //ihalo = addr_rank1(nall, na, index, ia);
-	  memcpy(buf + ihalo*sz, recvforw + icount*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  free(recvback);
-  free(recvforw);
-
-  MPI_Waitall(2, req + 2, status);
-
-  free(sendback);
-  free(sendforw);
-
-  /* Z direction */
-
-  nsend = nhcomm*na*(nlocal[X] + 2*nhcomm)*(nlocal[Y] + 2*nhcomm);
-  sendforw = (unsigned char *) malloc(nsend*sz);
-  sendback = (unsigned char *) malloc(nsend*sz);
-  recvforw = (unsigned char *) malloc(nsend*sz);
-  recvback = (unsigned char *) malloc(nsend*sz);
-  if (sendforw == NULL) fatal("malloc(sendforw) failed\n");
-  if (sendback == NULL) fatal("malloc(sendback) failed\n");
-  if (recvforw == NULL) fatal("malloc(recvforw) failed\n");
-  if (recvback == NULL) fatal("malloc(recvback) failed\n");
-
-  /* Load */
-  /* Some adjustment in the load required for 2d systems (X-Y) */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-      for (jc = 1 - nhcomm; jc <= nlocal[Y] + nhcomm; jc++) {
-	for (ia = 0; ia < na; ia++) {
-	  //kc = imin(1 + nh, nlocal[Z]);
-	  index = coords_index(ic, jc, kc);
-	  //ireal = addr_rank1(nall, na, index, ia);
-	  memcpy(sendback + icount*sz, buf + ireal*sz, sz);
-	  //kc = imax(nlocal[Z] - nh, 1);
-	  index = coords_index(ic, jc, kc);
-	  //ireal = addr_rank1(nall, na, index, ia);
-	  memcpy(sendforw + icount*sz, buf + ireal*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  if (cart_size(Z) == 1) {
-    memcpy(recvback, sendforw, nsend*sz);
-    memcpy(recvforw, sendback, nsend*sz);
-    req[2] = MPI_REQUEST_NULL;
-    req[3] = MPI_REQUEST_NULL;
-  }
-  else {
-    pforw = cart_neighb(FORWARD, Z);
-    pback = cart_neighb(BACKWARD, Z);
-    MPI_Irecv(recvforw, nsend, mpidata, pforw, tagb, comm, req);
-    MPI_Irecv(recvback, nsend, mpidata, pback, tagf, comm, req + 1);
-    MPI_Issend(sendback, nsend, mpidata, pback, tagb, comm, req + 2);
-    MPI_Issend(sendforw, nsend, mpidata, pforw, tagf, comm, req + 3);
-    /* Wait before unloading */
-    MPI_Waitall(2, req, status);
-  }
-
-  /* Unload */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-      for (jc = 1 - nhcomm; jc <= nlocal[Y] + nhcomm; jc++) {
-	for (ia = 0; ia < na; ia++) {
-	  index = coords_index(ic, jc, 0 - nh);
-	  //ihalo = addr_rank1(nall, na, index, ia);
-	  memcpy(buf + ihalo*sz, recvback + icount*sz, sz);
-	  index = coords_index(ic, jc, nlocal[Z] + 1 + nh);
-	  //ihalo = addr_rank1(nall, na, index, ia);
-	  memcpy(buf + ihalo*sz, recvforw + icount*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  free(recvback);
-  free(recvforw);
-
-  MPI_Waitall(2, req + 2, status);
-
-  free(sendback);
-  free(sendforw);
-
-  return 0;
-}
-
-/*********************************************************************/
-/*
-/*    Halo exchange via copy to a tmp buffer
-/*
-/*********************************************************************/
-
-int coords_field_halo_nonb(int nhcomm, int na, void * mbuf,
-			    MPI_Datatype mpidata, MPI_Datatype halo[3]) {
-  int sz;
-  int ic, jc, kc;
-  int ia, index;
-  int nh;
-  int ireal, ihalo;
-  int icount, nsend;
-  int pforw, pback;
-  int nlocal[3];
-
-  unsigned char * buf;
-  unsigned char * sendforw;
-  unsigned char * sendback;
-  unsigned char * recvforw;
-  unsigned char * recvback;
-
-  MPI_Comm comm;
-  MPI_Request req[4];
-  MPI_Status status[2];
-
-  const int tagf = 2015;
-  const int tagb = 2016;
-
-  assert(mbuf);
-  assert(mpidata == MPI_CHAR || mpidata == MPI_DOUBLE);
-
-  buf = (unsigned char *) mbuf;
-
-  comm = cart_comm();
-  if (mpidata == MPI_CHAR) sz = sizeof(char);
-  if (mpidata == MPI_DOUBLE) sz = sizeof(double);
-
-  coords_nlocal(nlocal);
-
-  /* X-direction */
-
-  nsend = nhcomm*na*nlocal[Y]*nlocal[Z];
-  sendforw = (unsigned char *) malloc(nsend*sz);
-  sendback = (unsigned char *) malloc(nsend*sz);
-  recvforw = (unsigned char *) malloc(nsend*sz);
-  recvback = (unsigned char *) malloc(nsend*sz);
-  if (sendforw == NULL) fatal("malloc(sendforw) failed\n");
-  if (sendback == NULL) fatal("malloc(sendback) failed\n");
-  if (recvforw == NULL) fatal("malloc(recvforw) failed\n");
-  if (recvback == NULL) fatal("malloc(recvback) failed\n");
-
-  /* Load send buffers */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (jc = 1; jc <= nlocal[Y]; jc++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
-	for (ia = 0; ia < na; ia++) {
-	  /* Backward going... */
-	  index = coords_index(1 + nh, jc, kc);
-	  ireal = na*index + ia;
-	  memcpy(sendback + icount*sz, buf + ireal*sz, sz);
-	  /* ...and forward going. */
-	  index = coords_index(nlocal[X] - nh, jc, kc);
-	  ireal = na*index +ia;
-	  memcpy(sendforw + icount*sz, buf + ireal*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  if (cart_size(X) == 1) {
-    memcpy(recvback, sendforw, nsend*sz);
-    memcpy(recvforw, sendback, nsend*sz);
-    req[2] = MPI_REQUEST_NULL;
-    req[3] = MPI_REQUEST_NULL;
-  }
-  else {
-    pforw = cart_neighb(FORWARD, X);
-    pback = cart_neighb(BACKWARD, X);
-    MPI_Irecv(recvforw, nsend, mpidata, pforw, tagb, comm, req);
-    MPI_Irecv(recvback, nsend, mpidata, pback, tagf, comm, req + 1);
-    MPI_Issend(sendback, nsend, mpidata, pback, tagb, comm, req + 2);
-    MPI_Issend(sendforw, nsend, mpidata, pforw, tagf, comm, req + 3);
-    /* Wait for receives */
-    MPI_Waitall(2, req, status);
-  }
-
-  /* Unload */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (jc = 1; jc <= nlocal[Y]; jc++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
-	for (ia = 0; ia < na; ia++) {
-	  index = coords_index(nlocal[X] + 1 + nh, jc, kc);
-	  ihalo = na*index +ia;
-	  memcpy(buf + ihalo*sz, recvforw + icount*sz, sz);
-	  index = coords_index(0 - nh, jc, kc);
-	  ihalo = na*index + ia;
-	  memcpy(buf + ihalo*sz, recvback + icount*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  free(recvback);
-  free(recvforw);
-
-  MPI_Waitall(2, req + 2, status);
-
-  free(sendback);
-  free(sendforw);
-
-  /* Y direction */
-
-  nsend = nhcomm*na*(nlocal[X] + 2*nhcomm)*nlocal[Z];
-  sendforw = (unsigned char *) malloc(nsend*sz);
-  sendback = (unsigned char *) malloc(nsend*sz);
-  recvforw = (unsigned char *) malloc(nsend*sz);
-  recvback = (unsigned char *) malloc(nsend*sz);
-  if (sendforw == NULL) fatal("malloc(sendforw) failed\n");
-  if (sendback == NULL) fatal("malloc(sendback) failed\n");
-  if (recvforw == NULL) fatal("malloc(recvforw) failed\n");
-  if (recvback == NULL) fatal("malloc(recvback) failed\n");
-
-  /* Load buffers */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
-	for (ia = 0; ia < na; ia++) {
-	  index = coords_index(ic, 1 + nh, kc);
-	  ireal = na*index + ia;
-	  memcpy(sendback + icount*sz, buf + ireal*sz, sz);
-	  index = coords_index(ic, nlocal[Y] - nh, kc);
-	  ireal = na*index + ia;
-	  memcpy(sendforw + icount*sz, buf + ireal*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  if (cart_size(Y) == 1) {
-    memcpy(recvback, sendforw, nsend*sz);
-    memcpy(recvforw, sendback, nsend*sz);
-    req[2] = MPI_REQUEST_NULL;
-    req[3] = MPI_REQUEST_NULL;
-  }
-  else {
-    pforw = cart_neighb(FORWARD, Y);
-    pback = cart_neighb(BACKWARD, Y);
-    MPI_Irecv(recvforw, nsend, mpidata, pforw, tagb, comm, req);
-    MPI_Irecv(recvback, nsend, mpidata, pback, tagf, comm, req + 1);
-    MPI_Issend(sendback, nsend, mpidata, pback, tagb, comm, req + 2);
-    MPI_Issend(sendforw, nsend, mpidata, pforw, tagf, comm, req + 3);
-    /* Wait for receives */
-    MPI_Waitall(2, req, status);
-  }
-
-  /* Unload */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
-	for (ia = 0; ia < na; ia++) {
-	  index = coords_index(ic, 0 - nh, kc);
-	  ihalo = na*index + ia;
-	  memcpy(buf + ihalo*sz, recvback + icount*sz, sz);
-	  index = coords_index(ic, nlocal[Y] + 1 + nh, kc);
-	  ihalo = na*index + ia;
-	  memcpy(buf + ihalo*sz, recvforw + icount*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  free(recvback);
-  free(recvforw);
-
-  MPI_Waitall(2, req + 2, status);
-
-  free(sendback);
-  free(sendforw);
-
-  /* Z direction */
-
-  nsend = nhcomm*na*(nlocal[X] + 2*nhcomm)*(nlocal[Y] + 2*nhcomm);
-  sendforw = (unsigned char *) malloc(nsend*sz);
-  sendback = (unsigned char *) malloc(nsend*sz);
-  recvforw = (unsigned char *) malloc(nsend*sz);
-  recvback = (unsigned char *) malloc(nsend*sz);
-  if (sendforw == NULL) fatal("malloc(sendforw) failed\n");
-  if (sendback == NULL) fatal("malloc(sendback) failed\n");
-  if (recvforw == NULL) fatal("malloc(recvforw) failed\n");
-  if (recvback == NULL) fatal("malloc(recvback) failed\n");
-
-  /* Load */
-  /* Some adjustment in the load required for 2d systems (X-Y) */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-      for (jc = 1 - nhcomm; jc <= nlocal[Y] + nhcomm; jc++) {
-	for (ia = 0; ia < na; ia++) {
-	  //kc = imin(1 + nh, nlocal[Z]);
-	  index = coords_index(ic, jc, 1+nh);
-	  ireal = na*index + ia;
-	  memcpy(sendback + icount*sz, buf + ireal*sz, sz);
-	  //kc = imax(nlocal[Z] - nh, 1);
-	  index = coords_index(ic, jc, nlocal[Z] - nh);
-	  ireal = na*index + ia;
-	  memcpy(sendforw + icount*sz, buf + ireal*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  if (cart_size(Z) == 1) {
-    memcpy(recvback, sendforw, nsend*sz);
-    memcpy(recvforw, sendback, nsend*sz);
-    req[2] = MPI_REQUEST_NULL;
-    req[3] = MPI_REQUEST_NULL;
-  }
-  else {
-    pforw = cart_neighb(FORWARD, Z);
-    pback = cart_neighb(BACKWARD, Z);
-    MPI_Irecv(recvforw, nsend, mpidata, pforw, tagb, comm, req);
-    MPI_Irecv(recvback, nsend, mpidata, pback, tagf, comm, req + 1);
-    MPI_Issend(sendback, nsend, mpidata, pback, tagb, comm, req + 2);
-    MPI_Issend(sendforw, nsend, mpidata, pforw, tagf, comm, req + 3);
-    /* Wait before unloading */
-    MPI_Waitall(2, req, status);
-  }
-
-  /* Unload */
-
-  icount = 0;
-
-  for (nh = 0; nh < nhcomm; nh++) {
-    for (ic = 1 - nhcomm; ic <= nlocal[X] + nhcomm; ic++) {
-      for (jc = 1 - nhcomm; jc <= nlocal[Y] + nhcomm; jc++) {
-	for (ia = 0; ia < na; ia++) {
-	  index = coords_index(ic, jc, 0 - nh);
-	  ihalo = na * index +ia;
-	  memcpy(buf + ihalo*sz, recvback + icount*sz, sz);
-	  index = coords_index(ic, jc, nlocal[Z] + 1 + nh);
-	  ihalo = na*index + ia;
-	  memcpy(buf + ihalo*sz, recvforw + icount*sz, sz);
-	  icount += 1;
-	}
-      }
-    }
-  }
-
-  assert(icount == nsend);
-
-  free(recvback);
-  free(recvforw);
-
-  MPI_Waitall(2, req + 2, status);
-
-  free(sendback);
-  free(sendforw);
 
   return 0;
 }

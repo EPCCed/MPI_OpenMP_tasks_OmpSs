@@ -16,7 +16,6 @@
 
 #include <stdio.h>
 #include <assert.h>
-
 #include "pe.h"
 #include "ludwig.h"
 #ifdef PETSC
@@ -36,7 +35,6 @@ int main(int argc, char ** argv) {
 
   int provided;
   MPI_Init_thread(&argc, &argv,MPI_THREAD_MULTIPLE,&provided);
-  
   assert(provided == MPI_THREAD_MULTIPLE);
 
   //MPI_Init(&argc, &argv);
@@ -45,9 +43,7 @@ int main(int argc, char ** argv) {
 #endif 
   if (argc > 1) sprintf(inputfile, "%s", argv[1]);
 
-
   ludwig_run(inputfile);
-  
 
 #ifdef PETSC
   PetscFinalize();

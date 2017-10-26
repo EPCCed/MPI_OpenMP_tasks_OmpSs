@@ -23,11 +23,5 @@ __targetHost__ int coords_field_init_mpi_indexed(int nhcomm, int nf, MPI_Datatyp
 				  MPI_Datatype halo[3]);
 __targetHost__ int coords_field_halo(int nhcomm, int nf, void * buf, MPI_Datatype mpidata,
 		      MPI_Datatype halo[3]);
-//__targetHost__ int coords_field_halo_d(int nhcomm, int nf, void * buf, MPI_Datatype mpidata);
-__targetHost__ int coords_field_halo_nonb(int nhcomm, int nf, void * buf, 
-					  MPI_Datatype mpidata,
-					  MPI_Datatype halo[3]);
-__targetHost__ int coords_field_halo_rank1(int nall, int nhcomm, int na,
-					   void * buf,
-					   MPI_Datatype mpidata);
+
 #endif

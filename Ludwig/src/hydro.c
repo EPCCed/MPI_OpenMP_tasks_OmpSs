@@ -16,7 +16,7 @@
 
 #include <assert.h>
 #include <math.h>
-#include <stdlib.h>
+#include <stdlib.h> 
 
 #include "pe.h"
 #include "coords.h"
@@ -71,24 +71,24 @@ int hydro_create(int nhcomm, hydro_t ** pobj) {
   /* allocate data space on target */
 
   targetCalloc((void**) &tmpptr, obj->nf*nsites*sizeof(double));
-  copyToTarget(&(obj->tcopy->u), &tmpptr, sizeof(double*));
+  copyToTarget(&(obj->tcopy->u), &tmpptr, sizeof(double*)); 
   obj->t_u = tmpptr; /* DEPRECATED direct access to target data. */
 
   targetCalloc((void**) &tmpptr, obj->nf*nsites*sizeof(double));
-  copyToTarget(&(obj->tcopy->f), &tmpptr, sizeof(double*));
+  copyToTarget(&(obj->tcopy->f), &tmpptr, sizeof(double*)); 
   obj->t_f = tmpptr; /* DEPRECATED direct access to target data. */
 
   copyToTarget(&(obj->tcopy->nf), &(obj->nf), sizeof(int));
 
   /* allocate target copies */
 
-#ifdef LB_DATA_SOA
+  #ifdef LB_DATA_SOA
   /* we will do nf halo exchanges, each with 1 field */
   coords_field_init_mpi_indexed(nhcomm, 1, MPI_DOUBLE, obj->uhalo);
-#else
+  #else
   /* we will do 1 halo exchange, with nf fields */
   coords_field_init_mpi_indexed(nhcomm, obj->nf, MPI_DOUBLE, obj->uhalo);
-#endif
+  #endif
 
   *pobj = obj;
 
@@ -113,12 +113,12 @@ void hydro_free(hydro_t * obj) {
   free(obj->f);
   free(obj->u);
 
-  copyFromTarget(&tmpptr, &(obj->tcopy->u), sizeof(double*));
+  copyFromTarget(&tmpptr, &(obj->tcopy->u), sizeof(double*)); 
   targetFree(tmpptr);
 
-  copyFromTarget(&tmpptr, &(obj->tcopy->f), sizeof(double*));
+  copyFromTarget(&tmpptr, &(obj->tcopy->f), sizeof(double*)); 
   targetFree(tmpptr);
-
+  
   targetFree(obj->tcopy);
   free(obj);
 
@@ -265,8 +265,8 @@ int hydro_f_local_add(hydro_t * obj, int index, const double force[3]) {
   nsites = le_nsites();
 
   for (ia = 0; ia < 3; ia++) {
-    obj->f[HYADR(nsites,obj->nf,index,ia)] += force[ia];
-  }
+    obj->f[HYADR(nsites,obj->nf,index,ia)] += force[ia]; 
+ }
 
   return 0;
 }
@@ -331,35 +331,27 @@ int hydro_u_zero(hydro_t * obj, const double uzero[3]) {
   coords_nlocal(nlocal);
 
   for (ic = 1; ic <= nlocal[X]; ic++) {
+    for (jc = 1; jc <= nlocal[Y]; jc++) {
+      for (kc = 1; kc <= nlocal[Z]; kc++) {
 
-#pragma omp task default(none) shared(obj,uzero,nlocal) firstprivate(ic) \
-  private(jc, kc, index)
-    {
-      for (jc = 1; jc <= nlocal[Y]; jc++) {
-        for (kc = 1; kc <= nlocal[Z]; kc++) {
-	  
-          index = coords_index(ic, jc, kc);
-          hydro_u_set(obj, index, uzero);
-	  
-        }
+	index = coords_index(ic, jc, kc);
+	hydro_u_set(obj, index, uzero);
+
       }
-    }// omp tasks
-    
+    }
   }
-  
-#pragma omp taskwait
-  
+
   return 0;
 }
-  
 
-  /*****************************************************************************
-   *
-   *  hydro_f_zero
-   *
-   *****************************************************************************/
 
-  int hydro_f_zero(hydro_t * obj, const double fzero[3]) {
+/*****************************************************************************
+ *
+ *  hydro_f_zero
+ *
+ *****************************************************************************/
+
+int hydro_f_zero(hydro_t * obj, const double fzero[3]) {
 
   int ic, jc, kc, index;
   int nlocal[3];
@@ -369,39 +361,33 @@ int hydro_u_zero(hydro_t * obj, const double uzero[3]) {
   coords_nlocal(nlocal);
 
   for (ic = 1; ic <= nlocal[X]; ic++) {
+    for (jc = 1; jc <= nlocal[Y]; jc++) {
+      for (kc = 1; kc <= nlocal[Z]; kc++) {
 
-#pragma omp task default(none) shared(obj,fzero,nlocal) firstprivate(ic)  private(jc, kc, index)
-    {
-      for (jc = 1; jc <= nlocal[Y]; jc++) {
-	for (kc = 1; kc <= nlocal[Z]; kc++) {
-	  
-	  index = coords_index(ic, jc, kc);
-	  hydro_f_local_set(obj, index, fzero);
-	  
-	}
+	index = coords_index(ic, jc, kc);
+	hydro_f_local_set(obj, index, fzero);
+
       }
-    }//omp tasks
-  }//outer for loop
-  
-#pragma omp taskwait
-  
+    }
+  }
+
   return 0;
 }
 
-  /*****************************************************************************
-   *
-   *  hydro_lees_edwards
-   *
-   *  Compute the 'look-across-the-boundary' values of the velocity field,
-   *  and update the velocity buffer region accordingly.
-   *
-   *  The communication might be improved:
-   *  - only one buffer either side of the planes needs to be set?
-   *  - only one communication per y sub domain if more than one buffer?
-   *
-   *****************************************************************************/
+/*****************************************************************************
+ *
+ *  hydro_lees_edwards
+ *
+ *  Compute the 'look-across-the-boundary' values of the velocity field,
+ *  and update the velocity buffer region accordingly.
+ *
+ *  The communication might be improved:
+ *  - only one buffer either side of the planes needs to be set?
+ *  - only one communication per y sub domain if more than one buffer?
+ *
+ *****************************************************************************/
 
-  int hydro_lees_edwards(hydro_t * obj) {
+int hydro_lees_edwards(hydro_t * obj) {
 
   int nhalo;
   int nlocal[3]; /* Local system size */
@@ -426,76 +412,76 @@ int hydro_u_zero(hydro_t * obj, const double uzero[3]) {
 
 
   if (cart_size(Y) > 1) {
-  if (le_get_nxbuffer())
-    hydro_lees_edwards_parallel(obj);
-}
+    if (le_get_nxbuffer())
+      hydro_lees_edwards_parallel(obj);
+  }
   else {
 
-  ule[X] = 0.0;
-  ule[Y] = 0.0;  /* Only y component will be non-zero */
-  ule[Z] = 0.0;
+    ule[X] = 0.0;
+    ule[Y] = 0.0;  /* Only y component will be non-zero */
+    ule[Z] = 0.0;
 
-  nhalo = coords_nhalo();
-  coords_nlocal(nlocal);
-  ib0 = nlocal[X] + nhalo + 1;
+    nhalo = coords_nhalo();
+    coords_nlocal(nlocal);
+    ib0 = nlocal[X] + nhalo + 1;
 
-  t = 1.0*get_step();
+    t = 1.0*get_step();
 
-  for (ib = 0; ib < le_get_nxbuffer(); ib++) {
+    for (ib = 0; ib < le_get_nxbuffer(); ib++) {
 
-  ic = le_index_buffer_to_real(ib);
-  dy = le_buffer_displacement(ib, t);
+      ic = le_index_buffer_to_real(ib);
+      dy = le_buffer_displacement(ib, t);
 
-  /* This is a slightly awkward way to compute the velocity
-   * jump: just the (+/-) displacement devided by time. */
+      /* This is a slightly awkward way to compute the velocity
+       * jump: just the (+/-) displacement devided by time. */
 
-  ule[Y] = dy/t; /* STEADY SHEAR ONLY */
+      ule[Y] = dy/t; /* STEADY SHEAR ONLY */
 
-  dy = fmod(dy, L(Y));
-  jdy = floor(dy);
-  fr  = dy - jdy;
+      dy = fmod(dy, L(Y));
+      jdy = floor(dy);
+      fr  = dy - jdy;
 
-  for (jc = 1 - nhalo; jc <= nlocal[Y] + nhalo; jc++) {
+      for (jc = 1 - nhalo; jc <= nlocal[Y] + nhalo; jc++) {
 
-  /* Actually required here is j1 = jc - jdy - 1, but there's
-   * horrible modular arithmetic for the periodic boundaries
-   * to ensure 1 <= j1,j2 <= nlocal[Y] */
+	/* Actually required here is j1 = jc - jdy - 1, but there's
+	 * horrible modular arithmetic for the periodic boundaries
+	 * to ensure 1 <= j1,j2 <= nlocal[Y] */
 
-  j1 = 1 + (jc - jdy - 2 + 2*nlocal[Y]) % nlocal[Y];
-  j2 = 1 + j1 % nlocal[Y];
+	j1 = 1 + (jc - jdy - 2 + 2*nlocal[Y]) % nlocal[Y];
+	j2 = 1 + j1 % nlocal[Y];
 
-  /* If nhcomm < nhalo, we could use nhcomm here in the kc loop.
-   * (As j1 and j2 are always in the domain proper, jc can use nhalo.) */
+	/* If nhcomm < nhalo, we could use nhcomm here in the kc loop.
+	 * (As j1 and j2 are always in the domain proper, jc can use nhalo.) */
 
-  for (kc = 1 - nhalo; kc <= nlocal[Z] + nhalo; kc++) {
-  index0 = le_site_index(ib0 + ib, jc, kc);
-  index1 = le_site_index(ic, j1, kc);
-  index2 = le_site_index(ic, j2, kc);
-  for (ia = 0; ia < 3; ia++) {
-  obj->u[HYADR(nsites,obj->nf,index0,ia)] = ule[ia] +
-    fr*obj->u[HYADR(nsites,obj->nf,index1,ia)] + (1.0 - fr)*obj->u[HYADR(nsites,obj->nf,index2,ia)];
-}
-}
-}
-}
-}
+	for (kc = 1 - nhalo; kc <= nlocal[Z] + nhalo; kc++) {
+	  index0 = le_site_index(ib0 + ib, jc, kc);
+	  index1 = le_site_index(ic, j1, kc);
+	  index2 = le_site_index(ic, j2, kc);
+	  for (ia = 0; ia < 3; ia++) {
+	    obj->u[HYADR(nsites,obj->nf,index0,ia)] = ule[ia] +
+	      fr*obj->u[HYADR(nsites,obj->nf,index1,ia)] + (1.0 - fr)*obj->u[HYADR(nsites,obj->nf,index2,ia)];
+	  }
+	}
+      }
+    }
+  }
 
   return 0;
 }
 
-  /*****************************************************************************
-   *
-   *  hydro_lees_edwards_parallel
-   *
-   *  The Lees Edwards transformation for the velocity field in parallel.
-   *  This is a linear interpolation.
-   *
-   *  Note that we communicate with up to 3 processors in each direction;
-   *  this avoids having to update the halos completely.
-   *
-   *****************************************************************************/
+/*****************************************************************************
+ *
+ *  hydro_lees_edwards_parallel
+ *
+ *  The Lees Edwards transformation for the velocity field in parallel.
+ *  This is a linear interpolation.
+ *
+ *  Note that we communicate with up to 3 processors in each direction;
+ *  this avoids having to update the halos completely.
+ *
+ *****************************************************************************/
 
-  static int hydro_lees_edwards_parallel(hydro_t * obj) {
+static int hydro_lees_edwards_parallel(hydro_t * obj) {
 
   int      nlocal[3];      /* Local system size */
   int      noffset[3];     /* Local starting offset */
@@ -525,9 +511,9 @@ int hydro_u_zero(hydro_t * obj, const double uzero[3]) {
 
   assert(obj);
 
-#ifdef LB_DATA_SOA
+  #ifdef LB_DATA_SOA
   fatal("LB_SATA_SOA not supported with hydro_lees_edwards_parallel\n");
-#endif
+  #endif
 
   nf = obj->nf;
 
@@ -588,19 +574,19 @@ int hydro_u_zero(hydro_t * obj, const double uzero[3]) {
 
     MPI_Irecv(buffer, nf*n1, MPI_DOUBLE, nrank_r[0], tag0, le_comm, request);
     MPI_Irecv(buffer + nf*n1, nf*n2, MPI_DOUBLE, nrank_r[1], tag1,
-              le_comm, request + 1);
+	      le_comm, request + 1);
     MPI_Irecv(buffer + nf*(n1 + n2), nf*n3, MPI_DOUBLE, nrank_r[2], tag2,
-              le_comm, request + 2);
+	      le_comm, request + 2);
 
     index = le_site_index(ic, j2, kc);
     MPI_Issend(&obj->u[nf*index], nf*n1, MPI_DOUBLE, nrank_s[0], tag0,
-               le_comm, request + 3);
+	       le_comm, request + 3);
 
     index = le_site_index(ic, 1, kc);
     MPI_Issend(&obj->u[nf*index], nf*n2, MPI_DOUBLE, nrank_s[1], tag1,
-               le_comm, request + 4);
+	       le_comm, request + 4);
     MPI_Issend(&obj->u[nf*index], nf*n3, MPI_DOUBLE, nrank_s[2], tag2,
-               le_comm, request + 5);
+	       le_comm, request + 5);
 
     MPI_Waitall(3, request, status);
 
@@ -613,12 +599,12 @@ int hydro_u_zero(hydro_t * obj, const double uzero[3]) {
       j2 = (jc + nhalo - 1 + 1)*(nlocal[Z] + 2*nhalo);
 
       for (kc = 1 - nhalo; kc <= nlocal[Z] + nhalo; kc++) {
-        index = le_site_index(ib0 + ib, jc, kc);
-        for (ia = 0; ia < 3; ia++) {
-          obj->u[nf*index + ia] = ule[ia]
-            + fr*buffer[nf*(j1 + kc + nhalo - 1) + ia]
-            + (1.0 - fr)*buffer[nf*(j2 + kc + nhalo - 1) + ia];
-        }
+	index = le_site_index(ib0 + ib, jc, kc);
+	for (ia = 0; ia < 3; ia++) {
+	  obj->u[nf*index + ia] = ule[ia]
+	    + fr*buffer[nf*(j1 + kc + nhalo - 1) + ia]
+	    + (1.0 - fr)*buffer[nf*(j2 + kc + nhalo - 1) + ia];
+	}
       }
     }
 
@@ -644,8 +630,8 @@ static int hydro_u_write(FILE * fp, int index, void * arg) {
   assert(fp);
   assert(obj);
 
-#ifdef LB_DATA_SOA
-
+  #ifdef LB_DATA_SOA
+  
   int nsites = le_nsites();
   int i;
   for (i = 0; i < 3; i++){
@@ -653,11 +639,11 @@ static int hydro_u_write(FILE * fp, int index, void * arg) {
     if (n != 1) fatal("fwrite(hydro->u) failed\n");
   }
 
-#else
+  #else    
 
   n = fwrite(&obj->u[obj->nf*index], sizeof(double), obj->nf, fp);
   if (n != obj->nf) fatal("fwrite(hydro->u) failed\n");
-#endif
+  #endif
 
   return 0;
 }
@@ -680,9 +666,9 @@ static int hydro_u_write_ascii(FILE * fp, int index, void * arg) {
   nsites = le_nsites();
 
   n = fprintf(fp, "%22.15e %22.15e %22.15e\n",
-              obj->u[HYADR(nsites,obj->nf,index,X)],
-              obj->u[HYADR(nsites,obj->nf,index,Y)],
-              obj->u[HYADR(nsites,obj->nf,index,Z)]);
+	      obj->u[HYADR(nsites,obj->nf,index,X)],
+	      obj->u[HYADR(nsites,obj->nf,index,Y)],
+	      obj->u[HYADR(nsites,obj->nf,index,Z)]);
 
   /* Expect total of 69 characters ... */
   if (n != 69) fatal("fprintf(hydro->u) failed\n");
@@ -704,9 +690,9 @@ int hydro_u_read(FILE * fp, int index, void * self) {
   assert(fp);
   assert(obj);
 
-#ifdef LB_DATA_SOA
+  #ifdef LB_DATA_SOA
   fatal("LB_SATA_SOA not supported with hydro_lees_edwards_parallel\n");
-#endif
+  #endif
 
   n = fread(&obj->u[obj->nf*index], sizeof(double), obj->nf, fp);
   if (n != obj->nf) fatal("fread(hydro->u) failed\n");
@@ -728,7 +714,7 @@ int hydro_u_read(FILE * fp, int index, void * self) {
  *****************************************************************************/
 
 int hydro_u_gradient_tensor(hydro_t * obj, int ic, int jc, int kc,
-                            double w[3][3]) {
+			    double w[3][3]) {
 
   int im1, ip1;
   int nsites;
@@ -785,8 +771,8 @@ int hydro_correct_momentum(hydro_t * hydro) {
   double f[3];
   double flocal[3] = {0.0, 0.0, 0.0};
   double fsum[3];
-  double rv;
-
+  double rv; 
+  
   MPI_Comm comm;
 
   if (hydro == NULL) return 0;
@@ -795,22 +781,22 @@ int hydro_correct_momentum(hydro_t * hydro) {
   comm = cart_comm();
 
   /* Compute force without correction. */
-
+  
   for (ic = 1; ic <= nlocal[X]; ic++) {
     for (jc = 1; jc <= nlocal[Y]; jc++) {
       for (kc = 1; kc <= nlocal[Z]; kc++) {
-
+    
         index = coords_index(ic, jc, kc);
-        hydro_f_local(hydro, index, f);
+        hydro_f_local(hydro, index, f); 
 
         flocal[X] += f[X];
         flocal[Y] += f[Y];
         flocal[Z] += f[Z];
-
-      }
-    }
+    
+      }   
+    }   
   }
-
+    
   /* calculate the total force per fluid node */
 
   MPI_Allreduce(flocal, fsum, 4, MPI_DOUBLE, MPI_SUM, comm);
@@ -827,11 +813,11 @@ int hydro_correct_momentum(hydro_t * hydro) {
       for (kc = 1; kc <= nlocal[Z]; kc++) {
 
         index = coords_index(ic, jc, kc);
-        hydro_f_local_add(hydro, index, f);
+        hydro_f_local_add(hydro, index, f); 
 
-      }
-    }
+      }   
+    }   
   }
-
+  
   return 0;
 }

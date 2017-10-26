@@ -56,7 +56,8 @@ static int pe_create(MPI_Comm parent) {
   assert(pe == NULL);
 
   MPI_Initialized(&ifail);
-
+  
+  
   if (ifail == 0) {
     printf("Please make sure MPI is initialised!\n");
     exit(0);
@@ -90,11 +91,17 @@ void pe_init(void) {
 
   pe_init_quiet();
   pe->unquiet = 1;
+  
+  int threads;
+#pragma omp parallel shared(threads)
+  {
+    threads= omp_get_num_threads();
+  }
 
-  info("Welcome to Ludwig v%d.%d.%d (%s version running on %d process%s)\n\n",
+  info("Welcome to Ludwig v%d.%d.%d (%s version running on %d process%s and %d OpenMP threads)\n\n",
        LUDWIG_MAJOR_VERSION, LUDWIG_MINOR_VERSION, LUDWIG_PATCH_VERSION,
        (pe->mpi_size > 1) ? "MPI" : "Serial", pe->mpi_size,
-       (pe->mpi_size == 1) ? "" : "es");
+       (pe->mpi_size == 1) ? "" : "es", threads);
 
   if (pe->mpi_rank == 0) {
     printf("The SVN revision details are: %s\n", svn_revision());
@@ -225,7 +232,6 @@ void info(const char * fmt, ...) {
 
   return;
 }
-
 
 /*****************************************************************************
  *

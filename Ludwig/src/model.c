@@ -99,9 +99,9 @@ void lb_free(lb_t * lb) {
   if (lb->io_info) io_info_destroy(lb->io_info);
   if (lb->f) free(lb->f);
   if (lb->fprime) free(lb->fprime);
+
   //if (lb->t_f) targetFree(lb->t_f);
   //if (lb->t_fprime) targetFree(lb->t_fprime);
-
 
   if (lb->tcopy) {
 
@@ -225,9 +225,6 @@ int lb_init(lb_t * lb) {
   copyToTarget(&(t_obj->fprime),&tmpptr,sizeof(double*));
 
   lb->t_fprime= tmpptr; //DEPRECATED direct access to target data.
-
-
-
 
 
   /* Set up the MPI Datatypes used for full halo messages:
@@ -599,38 +596,30 @@ int lb_io_info(lb_t * lb, io_info_t ** io_info) {
 int lb_halo(lb_t * lb) {
 
   assert(lb);
-#ifdef TASKS
+
   if (lb_order(lb) == MODEL) {
 
-    lb_halo_via_copy_nonblocking_tasks_start(lb);
-    lb_halo_via_copy_nonblocking_tasks_end(lb);
+#pragma omp parallel default(none) shared(lb)
+    {
+#pragma omp master
+      {
+        lb_halo_via_copy_nonblocking_start(lb);
+        lb_halo_via_copy_nonblocking_end(lb);
+      }
+    }
+
+    //lb_halo_via_copy_nonblocking_end(lb);
+    //lb_halo_via_copy(lb);
 
   }
   else {
+    printf("NOT COVERING THIS REGION: model.c:L618\n");
+    exit(1);
 
     /* MODEL_R only has ... */
-    info("MODEL_R: NOT IMPLEMENTED IN TASK MODE \n");
-    //TODO: This section is not tested yet
-    exit(0);
+    lb_halo_via_copy(lb);
   }
-  
-#else
 
-  if (lb_order(lb) == MODEL) {
-    //lb_halo_via_copy(lb);
-    lb_halo_via_copy_nonblocking_start(lb);
-    lb_halo_via_copy_nonblocking_end(lb);
-
-  }
-  else {
-    /* MODEL_R only has ... */
-    info("MODEL_R\n");
-    //TODO: This section is not tested yet
-    //lb_halo_via_copy(lb);
-    lb_halo_via_copy_nonblocking_start(lb);
-    lb_halo_via_copy_nonblocking_end(lb);
-  }
-#endif
   return 0;
 }
 
@@ -1351,7 +1340,7 @@ int lb_halo_via_copy(lb_t * lb) {
   if (sendback == NULL) fatal("malloc(sendback) failed\n");
   if (recvforw == NULL) fatal("malloc(recvforw) failed\n");
   if (recvforw == NULL) fatal("malloc(recvback) failed\n");
-  //info("nlocal[X] = %d | nlocal[Y] = %d | nlocal[Z] =%d\n",nlocal[X],nlocal[Y],nlocal[Z]);
+
   count = 0;
   for (p = 0; p < NVEL; p++) {
     for (n = 0; n < lb->ndist; n++) {
@@ -1610,16 +1599,19 @@ int lb_halo_via_copy_nonblocking_start(lb_t * lb) {
      12 neighbouring edges
      8 neighbouring corners */
 
-  //#pragma omp task depend(out:lb->hl.recvreq[0:5],lb->hl.sendreq[0:5])
+  //#pragma omp task default(none) shared(lb)
   halo_planes(lb);
-  
-  //#pragma omp task depend(out:lb->hl.recvreq[6:17],lb->hl.sendreq[6:17])
-  halo_edges(lb);
-  
-  //#pragma omp task depend(out:lb->hl.recvreq[18:25],lb->hl.sendreq[18:25])
-  halo_corners(lb);
-  
   //#pragma omp taskwait
+
+  //#pragma omp task default(none) shared(lb_edges)
+
+  halo_edges(lb);
+  //#pragma omp taskwait
+
+  //#pragma omp task default(none) shared(lb)
+  halo_corners(lb);
+
+#pragma omp taskwait
 
   return 0;
 }
@@ -1629,23 +1621,30 @@ int lb_halo_via_copy_nonblocking_end(lb_t * lb) {
   int n;
   int recvcount;
   int sendcount;
+  int fakedep;
 
-  for (n=0; n<26; n++){
-    //#pragma omp task depend (inout:lb->hl.recvreq[0:25]) 
-    MPI_Waitany(26, lb->hl.recvreq, &recvcount, lb->hl.status);
-  }
-  //#pragma omp taskwait
-
-  /* Copy data from MPI buffers */
-  //#pragma omp task depend (in: lb->hl.recvreq[0:25])
-  unpack_halo_buffers(lb);
-  
-  for (n=0; n<26; n++){
-    //#pragma omp task depend (in:lb->hl.sendreq[0:25])
-    MPI_Waitany(26, lb->hl.sendreq, &sendcount, lb->hl.status);
+#pragma omp task depend(out:fakedep)
+  {
+    for (n=0; n<26; n++){
+      MPI_Waitany(26, lb->hl.recvreq, &recvcount, lb->hl.status);
+    }
   }
 
+#pragma omp task
+  {
+    for (n=0; n<26; n++){
+      MPI_Waitany(26, lb->hl.sendreq, &sendcount, lb->hl.status);
+    }
+  }
 
+#pragma omp task depend(in:fakedep)
+  {
+    /* Copy data from MPI buffers */
+    unpack_halo_buffers(lb);
+  }
+
+
+#pragma omp taskwait
 
   return 0;
 }
@@ -1667,8 +1666,12 @@ void halo_planes(lb_t * lb) {
   int count;
   int nlocal[3];
 
-  const int tagf = 900;
-  const int tagb = 901;
+  const int tagXf = 850;
+  const int tagXb = 851;
+  const int tagYf = 852;
+  const int tagYb = 853;
+  const int tagZf = 854;
+  const int tagZb = 855;
 
   /* The ranks of neighbouring planes */
   int pforwX, pbackX, pforwY, pbackY, pforwZ, pbackZ;
@@ -1705,113 +1708,132 @@ void halo_planes(lb_t * lb) {
   lb->hl .recvforwXY = (double *) malloc(nsendXY*sizeof(double));
   lb->hl .recvbackXY = (double *) malloc(nsendXY*sizeof(double));
 
-  /* Receive planes in the X-direction */
-  /* PPM, NMM, P=Positive, M=Middle, N=Negative for the XYZ directions respectively */
-  pforwX = nonblocking_cart_neighb(PMM);
-  pbackX = nonblocking_cart_neighb(NMM);
-
-  MPI_Irecv(&lb->hl.recvforwYZ[0], nsendYZ, MPI_DOUBLE, pforwX, tagb, comm, 
-	    &lb->hl.recvreq[0]);
-  MPI_Irecv(&lb->hl .recvbackYZ[0], nsendYZ, MPI_DOUBLE, pbackX, tagf, comm,
-	    &lb->hl.recvreq[1]);
-
-  /* Receive planes in the Y-direction */
-  pforwY = nonblocking_cart_neighb(MPM);
-  pbackY = nonblocking_cart_neighb(MNM);
-
-  MPI_Irecv(&lb->hl .recvforwXZ[0], nsendXZ, MPI_DOUBLE, pforwY, tagb, comm, 
-	    &lb->hl.recvreq[2]);
-  MPI_Irecv(&lb->hl .recvbackXZ[0], nsendXZ, MPI_DOUBLE, pbackY, tagf, comm,
-	    &lb->hl.recvreq[3]);
-
-  /* Receive planes in the Z-direction */
-  pforwZ = nonblocking_cart_neighb(MMP);
-  pbackZ = nonblocking_cart_neighb(MMN);
-
-  MPI_Irecv(&lb->hl.recvforwXY[0], nsendXY, MPI_DOUBLE, pforwZ, tagb, comm, 
-	    &lb->hl.recvreq[4]);
-  MPI_Irecv(&lb->hl.recvbackXY[0], nsendXY, MPI_DOUBLE, pbackZ, tagf, comm, 
-	    &lb->hl.recvreq[5]);
-
-  /* Send in the X-direction (YZ plane) */
-  count = 0;
-  for (p = 0; p < NVEL; p++) {
-    for (n = 0; n < lb->ndist; n++) {
-      for (jc = 1; jc <= nlocal[Y]; jc++) {
-        for (kc = 1; kc <= nlocal[Z]; kc++) {
-
-          index = coords_index(nlocal[X], jc, kc);
-          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-          lb->hl.sendforwYZ[count] = fptr[indexreal];
-
-          index = coords_index(1, jc, kc);
-          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-          lb->hl.sendbackYZ[count] = fptr[indexreal];
-          ++count;
-        }
-      }
-    }
-  }
-  assert(count == nsendYZ);
-
-  MPI_Issend(&lb->hl .sendbackYZ [0], nsendYZ, MPI_DOUBLE, pbackX, tagb, comm, 
-	     &lb->hl.sendreq[0]);
-  MPI_Issend(&lb->hl .sendforwYZ [0], nsendYZ, MPI_DOUBLE, pforwX, tagf, comm, 
-	     &lb->hl.sendreq[1]);
 
 
-  /* Send in the Y-direction (XZ plane) */
-  count = 0;
-  for (p = 0; p < NVEL; p++) {
-    for (n = 0; n < lb->ndist; n++) {
-      for (ic = 1; ic <= nlocal[X]; ic++) {
-        for (kc = 1; kc <= nlocal[Z]; kc++) {
 
-          index = coords_index(ic, nlocal[Y], kc);
-          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-          lb->hl .sendforwXZ[count] = fptr[indexreal];
+#pragma omp task
+  {
+    /* Receive planes in the X-direction */
+    /* PPM, NMM, P=Positive, M=Middle, N=Negative for the XYZ directions respectively */
+    pforwX = nonblocking_cart_neighb(PMM);
+    pbackX = nonblocking_cart_neighb(NMM);
 
-          index = coords_index(ic, 1, kc);
-          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-          lb->hl .sendbackXZ[count] = fptr[indexreal];
-          ++count;
-        }
-      }
-    }
-  }
-  assert(count == nsendXZ);
-
-  MPI_Issend(&lb->hl .sendbackXZ[0], nsendXZ, MPI_DOUBLE, pbackY, tagb, comm, 
-	     &lb->hl.sendreq[2]);
-  MPI_Issend(&lb->hl .sendforwXZ[0], nsendXZ, MPI_DOUBLE, pforwY, tagf, comm, 
-	     &lb->hl.sendreq[3]);
+    MPI_Irecv(&lb->hl.recvforwYZ[0], nsendYZ, MPI_DOUBLE, pforwX, tagXb, comm,
+              &lb->hl.recvreq[0]);
+    MPI_Irecv(&lb->hl .recvbackYZ[0], nsendYZ, MPI_DOUBLE, pbackX, tagXf, comm,
+              &lb->hl.recvreq[1]);
 
 
-  /* Finally, Send in the Z-direction (XY plane) */
-  count = 0;
-  for (p = 0; p < NVEL; p++) {
-    for (n = 0; n < lb->ndist; n++) {
-      for (ic = 1; ic <= nlocal[X]; ic++) {
+    //printf(" %d \n",omp_get_thread_num());
+    /* Send in the X-direction (YZ plane) */
+    count = 0;
+    for (p = 0; p < NVEL; p++) {
+      for (n = 0; n < lb->ndist; n++) {
         for (jc = 1; jc <= nlocal[Y]; jc++) {
+          for (kc = 1; kc <= nlocal[Z]; kc++) {
 
-          index = coords_index(ic, jc, nlocal[Z]);
-          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-          lb->hl .sendforwXY[count] = fptr[indexreal];
+            index = coords_index(nlocal[X], jc, kc);
+            indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+            lb->hl.sendforwYZ[count] = fptr[indexreal];
 
-          index = coords_index(ic, jc, 1);
-          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-          lb->hl .sendbackXY[count] = fptr[indexreal];
-          ++count;
+            index = coords_index(1, jc, kc);
+            indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+            lb->hl.sendbackYZ[count] = fptr[indexreal];
+            ++count;
+          }
         }
       }
     }
-  }
-  assert(count == nsendXY);
+    assert(count == nsendYZ);
 
-  MPI_Issend(&lb->hl .sendbackXY[0], nsendXY, MPI_DOUBLE, pbackZ, tagb, comm, 
-	     &lb->hl.sendreq[4]);
-  MPI_Issend(&lb->hl .sendforwXY[0], nsendXY, MPI_DOUBLE, pforwZ, tagf, comm, 
-	     &lb->hl.sendreq[5]);
+    MPI_Issend(&lb->hl .sendbackYZ [0], nsendYZ, MPI_DOUBLE, pbackX, tagXb, comm,
+               &lb->hl.sendreq[0]);
+    MPI_Issend(&lb->hl .sendforwYZ [0], nsendYZ, MPI_DOUBLE, pforwX, tagXf, comm,
+               &lb->hl.sendreq[1]);
+
+  }
+
+#pragma omp task
+  {
+    /* Receive planes in the Y-direction */
+    pforwY = nonblocking_cart_neighb(MPM);
+    pbackY = nonblocking_cart_neighb(MNM);
+
+    MPI_Irecv(&lb->hl .recvforwXZ[0], nsendXZ, MPI_DOUBLE, pforwY, tagYb, comm,
+              &lb->hl.recvreq[2]);
+    MPI_Irecv(&lb->hl .recvbackXZ[0], nsendXZ, MPI_DOUBLE, pbackY, tagYf, comm,
+              &lb->hl.recvreq[3]);
+
+    //printf(" %d \n",omp_get_thread_num());
+    /* Send in the Y-direction (XZ plane) */
+    count = 0;
+    for (p = 0; p < NVEL; p++) {
+      for (n = 0; n < lb->ndist; n++) {
+        for (ic = 1; ic <= nlocal[X]; ic++) {
+          for (kc = 1; kc <= nlocal[Z]; kc++) {
+
+            index = coords_index(ic, nlocal[Y], kc);
+            indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+            lb->hl .sendforwXZ[count] = fptr[indexreal];
+
+            index = coords_index(ic, 1, kc);
+            indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+            lb->hl .sendbackXZ[count] = fptr[indexreal];
+            ++count;
+          }
+        }
+      }
+    }
+
+    assert(count == nsendXZ);
+
+    MPI_Issend(&lb->hl .sendbackXZ[0], nsendXZ, MPI_DOUBLE, pbackY, tagYb, comm,
+               &lb->hl.sendreq[2]);
+    MPI_Issend(&lb->hl .sendforwXZ[0], nsendXZ, MPI_DOUBLE, pforwY, tagYf, comm,
+               &lb->hl.sendreq[3]);
+
+  }
+
+
+#pragma omp task
+  {
+
+    /* Receive planes in the Z-direction */
+    pforwZ = nonblocking_cart_neighb(MMP);
+    pbackZ = nonblocking_cart_neighb(MMN);
+
+    MPI_Irecv(&lb->hl .recvforwXY[0], nsendXY, MPI_DOUBLE, pforwZ, tagZb, comm,
+              &lb->hl.recvreq[4]);
+    MPI_Irecv(&lb->hl .recvbackXY[0], nsendXY, MPI_DOUBLE, pbackZ, tagZf, comm,
+              &lb->hl.recvreq[5]);
+
+    /* Finally, Send in the Z-direction (XY plane) */
+    count = 0;
+    for (p = 0; p < NVEL; p++) {
+      for (n = 0; n < lb->ndist; n++) {
+        for (ic = 1; ic <= nlocal[X]; ic++) {
+          for (jc = 1; jc <= nlocal[Y]; jc++) {
+
+            index = coords_index(ic, jc, nlocal[Z]);
+            indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+            lb->hl .sendforwXY[count] = fptr[indexreal];
+
+            index = coords_index(ic, jc, 1);
+            indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+            lb->hl .sendbackXY[count] = fptr[indexreal];
+            ++count;
+          }
+        }
+      }
+    }
+
+    assert(count == nsendXY);
+
+    MPI_Issend(&lb->hl .sendbackXY[0], nsendXY, MPI_DOUBLE, pbackZ, tagZb, comm,
+               &lb->hl.sendreq[4]);
+    MPI_Issend(&lb->hl .sendforwXY[0], nsendXY, MPI_DOUBLE, pforwZ, tagZf, comm,
+               &lb->hl.sendreq[5]);
+  }
 
   return;
 
@@ -1834,10 +1856,20 @@ void halo_edges(lb_t * lb) {
   int count;
   int nlocal[3];
 
-  const int tagnn = 903;
-  const int tagnp = 904;
-  const int tagpn = 905;
-  const int tagpp = 906;
+  const int tagXnn = 860;
+  const int tagXnp = 861;
+  const int tagXpn = 862;
+  const int tagXpp = 863;
+
+  const int tagYnn = 864;
+  const int tagYnp = 865;
+  const int tagYpn = 866;
+  const int tagYpp = 867;
+
+  const int tagZnn = 868;
+  const int tagZnp = 869;
+  const int tagZpn = 870;
+  const int tagZpp = 871;
 
   /* Ranks of neighbouring edges.
      Xpp, X is the direction, parallel to which edges are
@@ -1850,7 +1882,7 @@ void halo_edges(lb_t * lb) {
 
   coords_nlocal(nlocal);
 
-  double* fptr; /*pointer to the distribution*/
+  double* fptr;   /*pointer to the distribution*/
   if (get_step()) /* we are in the timestep, so use target copy */
     fptr=lb->tcopy->f;
   else
@@ -1888,134 +1920,156 @@ void halo_edges(lb_t * lb) {
   lb->hl .sendZpp = (double *) malloc(nsendZ*sizeof(double));
   lb->hl .recvZpp = (double *) malloc(nsendZ*sizeof(double));
 
-  /* Receive edges parallel to x-direction*/
-  Xnn = nonblocking_cart_neighb(MNN);
-  Xnp = nonblocking_cart_neighb(MNP);
-  Xpn = nonblocking_cart_neighb(MPN);
-  Xpp = nonblocking_cart_neighb(MPP);
 
-  MPI_Irecv(&lb->hl.recvXnn[0], nsendX, MPI_DOUBLE, Xnn, tagpp, comm, &lb->hl.recvreq[6]);
-  MPI_Irecv(&lb->hl.recvXnp[0], nsendX, MPI_DOUBLE, Xnp, tagpn, comm, &lb->hl.recvreq[7]);
-  MPI_Irecv(&lb->hl.recvXpn[0], nsendX, MPI_DOUBLE, Xpn, tagnp, comm, &lb->hl.recvreq[8]);
-  MPI_Irecv(&lb->hl.recvXpp[0], nsendX, MPI_DOUBLE, Xpp, tagnn, comm, &lb->hl.recvreq[9]);
 
-  /* Receive edges parallel to y-direction*/
-  Ynn = nonblocking_cart_neighb(NMN);
-  Ynp = nonblocking_cart_neighb(NMP);
-  Ypn = nonblocking_cart_neighb(PMN);
-  Ypp = nonblocking_cart_neighb(PMP);
 
-  MPI_Irecv(&lb->hl.recvYnn[0], nsendY, MPI_DOUBLE, Ynn, tagpp, comm, &lb->hl.recvreq[10]);
-  MPI_Irecv(&lb->hl.recvYnp[0], nsendY, MPI_DOUBLE, Ynp, tagpn, comm, &lb->hl.recvreq[11]);
-  MPI_Irecv(&lb->hl.recvYpn[0], nsendY, MPI_DOUBLE, Ypn, tagnp, comm, &lb->hl.recvreq[12]);
-  MPI_Irecv(&lb->hl.recvYpp[0], nsendY, MPI_DOUBLE, Ypp, tagnn, comm, &lb->hl.recvreq[13]);
 
-  /* Receive edges parallel to z-direction*/
-  Znn = nonblocking_cart_neighb(NNM);
-  Znp = nonblocking_cart_neighb(NPM);
-  Zpn = nonblocking_cart_neighb(PNM);
-  Zpp = nonblocking_cart_neighb(PPM);
+#pragma omp task
+  {
 
-  MPI_Irecv(&lb->hl.recvZnn[0], nsendZ, MPI_DOUBLE, Znn, tagpp, comm, &lb->hl.recvreq[14]);
-  MPI_Irecv(&lb->hl.recvZnp[0], nsendZ, MPI_DOUBLE, Znp, tagpn, comm, &lb->hl.recvreq[15]);
-  MPI_Irecv(&lb->hl.recvZpn[0], nsendZ, MPI_DOUBLE, Zpn, tagnp, comm, &lb->hl.recvreq[16]);
-  MPI_Irecv(&lb->hl.recvZpp[0], nsendZ, MPI_DOUBLE, Zpp, tagnn, comm, &lb->hl.recvreq[17]);
+    /* Receive edges parallel to x-direction*/
+    Xnn = nonblocking_cart_neighb(MNN);
+    Xnp = nonblocking_cart_neighb(MNP);
+    Xpn = nonblocking_cart_neighb(MPN);
+    Xpp = nonblocking_cart_neighb(MPP);
 
-  /* Send edges parallel to x-direction */
-  count = 0;
-  for (p = 0; p < NVEL; p++) {
-    for (n = 0; n < lb->ndist; n++) {
-      for (ic = 1; ic <= nlocal[X]; ic++) {
+    MPI_Irecv(&lb->hl.recvXnn[0], nsendX, MPI_DOUBLE, Xnn, tagXpp, comm, &lb->hl.recvreq[6]);
+    MPI_Irecv(&lb->hl.recvXnp[0], nsendX, MPI_DOUBLE, Xnp, tagXpn, comm, &lb->hl.recvreq[7]);
+    MPI_Irecv(&lb->hl.recvXpn[0], nsendX, MPI_DOUBLE, Xpn, tagXnp, comm, &lb->hl.recvreq[8]);
+    MPI_Irecv(&lb->hl.recvXpp[0], nsendX, MPI_DOUBLE, Xpp, tagXnn, comm, &lb->hl.recvreq[9]);
 
-        index = coords_index(ic, 1, 1);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendXnn[count] = fptr[indexreal];
+    //printf(" %d \n",omp_get_thread_num());
+    /* Send edges parallel to x-direction */
+    count = 0;
+    for (p = 0; p < NVEL; p++) {
+      for (n = 0; n < lb->ndist; n++) {
+        for (ic = 1; ic <= nlocal[X]; ic++) {
 
-        index = coords_index(ic, 1, nlocal[Z]);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendXnp[count] = fptr[indexreal];
+          index = coords_index(ic, 1, 1);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendXnn[count] = fptr[indexreal];
 
-        index = coords_index(ic, nlocal[Y], 1);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendXpn[count] = fptr[indexreal];
+          index = coords_index(ic, 1, nlocal[Z]);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendXnp[count] = fptr[indexreal];
 
-        index = coords_index(ic, nlocal[Y], nlocal[Z]);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendXpp[count] = fptr[indexreal];
-        ++count;
+          index = coords_index(ic, nlocal[Y], 1);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendXpn[count] = fptr[indexreal];
+
+          index = coords_index(ic, nlocal[Y], nlocal[Z]);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendXpp[count] = fptr[indexreal];
+          ++count;
+        }
       }
     }
+    assert(count == nsendX);
+
+
+    MPI_Issend(&lb->hl .sendXpp[0], nsendX, MPI_DOUBLE, Xpp, tagXpp, comm, &lb->hl.sendreq[6]);
+    MPI_Issend(&lb->hl .sendXpn[0], nsendX, MPI_DOUBLE, Xpn, tagXpn, comm, &lb->hl.sendreq[7]);
+    MPI_Issend(&lb->hl .sendXnp[0], nsendX, MPI_DOUBLE, Xnp, tagXnp, comm, &lb->hl.sendreq[8]);
+    MPI_Issend(&lb->hl .sendXnn[0], nsendX, MPI_DOUBLE, Xnn, tagXnn, comm, &lb->hl.sendreq[9]);
   }
-  assert(count == nsendX);
 
-  MPI_Issend(&lb->hl .sendXpp[0], nsendX, MPI_DOUBLE, Xpp, tagpp, comm, &lb->hl.sendreq[6]);
-  MPI_Issend(&lb->hl .sendXpn[0], nsendX, MPI_DOUBLE, Xpn, tagpn, comm, &lb->hl.sendreq[7]);
-  MPI_Issend(&lb->hl .sendXnp[0], nsendX, MPI_DOUBLE, Xnp, tagnp, comm, &lb->hl.sendreq[8]);
-  MPI_Issend(&lb->hl .sendXnn[0], nsendX, MPI_DOUBLE, Xnn, tagnn, comm, &lb->hl.sendreq[9]);
+#pragma omp task //default(shared) firstprivate(count,p,n,jc,index,indexreal)
+  {
+    //printf(" %d \n",omp_get_thread_num());
+    /* Send edges parallel to y-direction */
 
-  /* Send edges parallel to y-direction */
-  count = 0;
-  for (p = 0; p < NVEL; p++) {
-    for (n = 0; n < lb->ndist; n++) {
-      for (jc = 1; jc <= nlocal[Y]; jc++) {
+    /* Receive edges parallel to y-direction*/
+    Ynn = nonblocking_cart_neighb(NMN);
+    Ynp = nonblocking_cart_neighb(NMP);
+    Ypn = nonblocking_cart_neighb(PMN);
+    Ypp = nonblocking_cart_neighb(PMP);
 
-        index = coords_index(1, jc, 1);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendYnn[count] = fptr[indexreal];
+    MPI_Irecv(&lb->hl.recvYnn[0], nsendY, MPI_DOUBLE, Ynn, tagYpp, comm, &lb->hl.recvreq[10]);
+    MPI_Irecv(&lb->hl.recvYnp[0], nsendY, MPI_DOUBLE, Ynp, tagYpn, comm, &lb->hl.recvreq[11]);
+    MPI_Irecv(&lb->hl.recvYpn[0], nsendY, MPI_DOUBLE, Ypn, tagYnp, comm, &lb->hl.recvreq[12]);
+    MPI_Irecv(&lb->hl.recvYpp[0], nsendY, MPI_DOUBLE, Ypp, tagYnn, comm, &lb->hl.recvreq[13]);
 
-        index = coords_index(1, jc, nlocal[Z]);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendYnp[count] = fptr[indexreal];
+    count = 0;
+    for (p = 0; p < NVEL; p++) {
+      for (n = 0; n < lb->ndist; n++) {
+        for (jc = 1; jc <= nlocal[Y]; jc++) {
 
-        index = coords_index(nlocal[X], jc, 1);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendYpn[count] = fptr[indexreal];
+          index = coords_index(1, jc, 1);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendYnn[count] = fptr[indexreal];
 
-        index = coords_index(nlocal[X], jc, nlocal[Z]);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendYpp[count] = fptr[indexreal];
-        ++count;
+          index = coords_index(1, jc, nlocal[Z]);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendYnp[count] = fptr[indexreal];
+
+          index = coords_index(nlocal[X], jc, 1);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendYpn[count] = fptr[indexreal];
+
+          index = coords_index(nlocal[X], jc, nlocal[Z]);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendYpp[count] = fptr[indexreal];
+          ++count;
+        }
       }
     }
+    assert(count == nsendY);
+
+    MPI_Issend(&lb->hl .sendYpp[0], nsendY, MPI_DOUBLE, Ypp, tagYpp, comm, &lb->hl.sendreq[10]);
+    MPI_Issend(&lb->hl .sendYpn[0], nsendY, MPI_DOUBLE, Ypn, tagYpn, comm, &lb->hl.sendreq[11]);
+    MPI_Issend(&lb->hl .sendYnp[0], nsendY, MPI_DOUBLE, Ynp, tagYnp, comm, &lb->hl.sendreq[12]);
+    MPI_Issend(&lb->hl .sendYnn[0], nsendY, MPI_DOUBLE, Ynn, tagYnn, comm, &lb->hl.sendreq[13]);
   }
-  assert(count == nsendY);
 
-  MPI_Issend(&lb->hl .sendYpp[0], nsendY, MPI_DOUBLE, Ypp, tagpp, comm, &lb->hl.sendreq[10]);
-  MPI_Issend(&lb->hl .sendYpn[0], nsendY, MPI_DOUBLE, Ypn, tagpn, comm, &lb->hl.sendreq[11]);
-  MPI_Issend(&lb->hl .sendYnp[0], nsendY, MPI_DOUBLE, Ynp, tagnp, comm, &lb->hl.sendreq[12]);
-  MPI_Issend(&lb->hl .sendYnn[0], nsendY, MPI_DOUBLE, Ynn, tagnn, comm, &lb->hl.sendreq[13]);
+#pragma omp task  //default(shared) firstprivate(count,p,n,kc,index,indexreal)
+  {
 
-  /* Send edges parallel to z-direction */
-  count = 0;
-  for (p = 0; p < NVEL; p++) {
-    for (n = 0; n < lb->ndist; n++) {
-      for (kc = 1; kc <= nlocal[Z]; kc++) {
+    /* Receive edges parallel to z-direction*/
+    Znn = nonblocking_cart_neighb(NNM);
+    Znp = nonblocking_cart_neighb(NPM);
+    Zpn = nonblocking_cart_neighb(PNM);
+    Zpp = nonblocking_cart_neighb(PPM);
 
-        index = coords_index(1, 1, kc);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendZnn[count] = fptr[indexreal];
+    MPI_Irecv(&lb->hl.recvZnn[0], nsendZ, MPI_DOUBLE, Znn, tagZpp, comm, &lb->hl.recvreq[14]);
+    MPI_Irecv(&lb->hl.recvZnp[0], nsendZ, MPI_DOUBLE, Znp, tagZpn, comm, &lb->hl.recvreq[15]);
+    MPI_Irecv(&lb->hl.recvZpn[0], nsendZ, MPI_DOUBLE, Zpn, tagZnp, comm, &lb->hl.recvreq[16]);
+    MPI_Irecv(&lb->hl.recvZpp[0], nsendZ, MPI_DOUBLE, Zpp, tagZnn, comm, &lb->hl.recvreq[17]);
 
-        index = coords_index(1, nlocal[Y], kc);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendZnp[count] = fptr[indexreal];
+    //printf(" %d \n",omp_get_thread_num());
+    /* Send edges parallel to z-direction */
+    count = 0;
+    for (p = 0; p < NVEL; p++) {
+      for (n = 0; n < lb->ndist; n++) {
+        for (kc = 1; kc <= nlocal[Z]; kc++) {
 
-        index = coords_index(nlocal[X], 1, kc);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendZpn[count] = fptr[indexreal];
+          index = coords_index(1, 1, kc);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendZnn[count] = fptr[indexreal];
 
-        index = coords_index(nlocal[X], nlocal[Y], kc);
-        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-        lb->hl .sendZpp[count] = fptr[indexreal];
-        ++count;
+          index = coords_index(1, nlocal[Y], kc);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendZnp[count] = fptr[indexreal];
+
+          index = coords_index(nlocal[X], 1, kc);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendZpn[count] = fptr[indexreal];
+
+          index = coords_index(nlocal[X], nlocal[Y], kc);
+          indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+          lb->hl .sendZpp[count] = fptr[indexreal];
+          ++count;
+        }
       }
     }
-  }
-  assert(count == nsendZ);
 
-  MPI_Issend(&lb->hl .sendZpp[0] , nsendZ, MPI_DOUBLE, Zpp, tagpp, comm, &lb->hl.sendreq[14]);
-  MPI_Issend(&lb->hl .sendZpn[0], nsendZ, MPI_DOUBLE, Zpn, tagpn, comm, &lb->hl.sendreq[15]);
-  MPI_Issend(&lb->hl .sendZnp[0], nsendZ, MPI_DOUBLE, Znp, tagnp, comm, &lb->hl.sendreq[16]);
-  MPI_Issend(&lb->hl .sendZnn[0], nsendZ, MPI_DOUBLE, Znn, tagnn, comm, &lb->hl.sendreq[17]);
+    assert(count == nsendZ);
+
+
+    MPI_Issend(&lb->hl .sendZpp[0], nsendZ, MPI_DOUBLE, Zpp, tagZpp, comm, &lb->hl.sendreq[14]);
+    MPI_Issend(&lb->hl .sendZpn[0], nsendZ, MPI_DOUBLE, Zpn, tagZpn, comm, &lb->hl.sendreq[15]);
+    MPI_Issend(&lb->hl .sendZnp[0], nsendZ, MPI_DOUBLE, Znp, tagZnp, comm, &lb->hl.sendreq[16]);
+    MPI_Issend(&lb->hl .sendZnn[0], nsendZ, MPI_DOUBLE, Znn, tagZnn, comm, &lb->hl.sendreq[17]);
+  }
 
   return;
 }
@@ -2090,64 +2144,70 @@ void halo_corners(lb_t * lb) {
   pnp = nonblocking_cart_neighb(PNP);
   ppn = nonblocking_cart_neighb(PPN);
   ppp = nonblocking_cart_neighb(PPP);
+  int fake;
 
-  MPI_Irecv(&lb->hl.recvnnn[0], nsend, MPI_DOUBLE, nnn, tagppp, comm, &lb->hl.recvreq[18]);
-  MPI_Irecv(&lb->hl.recvnnp[0], nsend, MPI_DOUBLE, nnp, tagppn, comm, &lb->hl.recvreq[19]);
-  MPI_Irecv(&lb->hl.recvnpn[0], nsend, MPI_DOUBLE, npn, tagpnp, comm, &lb->hl.recvreq[20]);
-  MPI_Irecv(&lb->hl.recvnpp[0], nsend, MPI_DOUBLE, npp, tagpnn, comm, &lb->hl.recvreq[21]);
-  MPI_Irecv(&lb->hl.recvpnn[0], nsend, MPI_DOUBLE, pnn, tagnpp, comm, &lb->hl.recvreq[22]);
-  MPI_Irecv(&lb->hl.recvpnp[0], nsend, MPI_DOUBLE, pnp, tagnpn, comm, &lb->hl.recvreq[23]);
-  MPI_Irecv(&lb->hl.recvppn[0], nsend, MPI_DOUBLE, ppn, tagnnp, comm, &lb->hl.recvreq[24]);
-  MPI_Irecv(&lb->hl.recvppp[0], nsend, MPI_DOUBLE, ppp, tagnnn, comm, &lb->hl.recvreq[25]);
-
-  count = 0;
-  for (p = 0; p < NVEL; p++) {
-    for (n = 0; n < lb->ndist; n++) {
-
-      index = coords_index(1, 1, 1);
-      indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-      lb->hl .sendnnn[count] = fptr[indexreal];
-
-      index = coords_index(1, 1, nlocal[Z]);
-      indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-      lb->hl .sendnnp[count] = fptr[indexreal];
-
-      index = coords_index(1, nlocal[Y], 1);
-      indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-      lb->hl .sendnpn[count] = fptr[indexreal];
-
-      index = coords_index(1, nlocal[Y], nlocal[Z]);
-      indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-      lb->hl .sendnpp[count] = fptr[indexreal];
-
-      index = coords_index(nlocal[X], 1, 1);
-      indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-      lb->hl .sendpnn[count] = fptr[indexreal];
-
-      index = coords_index(nlocal[X], 1, nlocal[Z]);
-      indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-      lb->hl .sendpnp[count] = fptr[indexreal];
-
-      index = coords_index(nlocal[X], nlocal[Y], 1);
-      indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-      lb->hl .sendppn[count] = fptr[indexreal];
-
-      index = coords_index(nlocal[X], nlocal[Y], nlocal[Z]);
-      indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
-      lb->hl .sendppp[count] = fptr[indexreal];
-      count++;
-    }
+#pragma omp task
+  {
+    MPI_Irecv(&lb->hl.recvnnn[0], nsend, MPI_DOUBLE, nnn, tagppp, comm, &lb->hl.recvreq[18]);
+    MPI_Irecv(&lb->hl.recvnnp[0], nsend, MPI_DOUBLE, nnp, tagppn, comm, &lb->hl.recvreq[19]);
+    MPI_Irecv(&lb->hl.recvnpn[0], nsend, MPI_DOUBLE, npn, tagpnp, comm, &lb->hl.recvreq[20]);
+    MPI_Irecv(&lb->hl.recvnpp[0], nsend, MPI_DOUBLE, npp, tagpnn, comm, &lb->hl.recvreq[21]);
+    MPI_Irecv(&lb->hl.recvpnn[0], nsend, MPI_DOUBLE, pnn, tagnpp, comm, &lb->hl.recvreq[22]);
+    MPI_Irecv(&lb->hl.recvpnp[0], nsend, MPI_DOUBLE, pnp, tagnpn, comm, &lb->hl.recvreq[23]);
+    MPI_Irecv(&lb->hl.recvppn[0], nsend, MPI_DOUBLE, ppn, tagnnp, comm, &lb->hl.recvreq[24]);
+    MPI_Irecv(&lb->hl.recvppp[0], nsend, MPI_DOUBLE, ppp, tagnnn, comm, &lb->hl.recvreq[25]);
   }
 
-  MPI_Issend(&lb->hl .sendppp[0], nsend, MPI_DOUBLE, ppp, tagppp, comm, &lb->hl.sendreq[18]);
-  MPI_Issend(&lb->hl .sendppn[0], nsend, MPI_DOUBLE, ppn, tagppn, comm, &lb->hl.sendreq[19]);
-  MPI_Issend(&lb->hl .sendpnp[0], nsend, MPI_DOUBLE, pnp, tagpnp, comm, &lb->hl.sendreq[20]);
-  MPI_Issend(&lb->hl .sendpnn[0], nsend, MPI_DOUBLE, pnn, tagpnn, comm, &lb->hl.sendreq[21]);
-  MPI_Issend(&lb->hl .sendnpp[0], nsend, MPI_DOUBLE, npp, tagnpp, comm, &lb->hl.sendreq[22]);
-  MPI_Issend(&lb->hl .sendnpn[0], nsend, MPI_DOUBLE, npn, tagnpn, comm, &lb->hl.sendreq[23]);
-  MPI_Issend(&lb->hl .sendnnp[0], nsend, MPI_DOUBLE, nnp, tagnnp, comm, &lb->hl.sendreq[24]);
-  MPI_Issend(&lb->hl .sendnnn[0], nsend, MPI_DOUBLE, nnn, tagnnn, comm, &lb->hl.sendreq[25]);
+#pragma omp task
+  {
+    count = 0;
+    for (p = 0; p < NVEL; p++) {
+      for (n = 0; n < lb->ndist; n++) {
 
+        index = coords_index(1, 1, 1);
+        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+        lb->hl .sendnnn[count] = fptr[indexreal];
+
+        index = coords_index(1, 1, nlocal[Z]);
+        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+        lb->hl .sendnnp[count] = fptr[indexreal];
+
+        index = coords_index(1, nlocal[Y], 1);
+        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+        lb->hl .sendnpn[count] = fptr[indexreal];
+
+        index = coords_index(1, nlocal[Y], nlocal[Z]);
+        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+        lb->hl .sendnpp[count] = fptr[indexreal];
+
+        index = coords_index(nlocal[X], 1, 1);
+        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+        lb->hl .sendpnn[count] = fptr[indexreal];
+
+        index = coords_index(nlocal[X], 1, nlocal[Z]);
+        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+        lb->hl .sendpnp[count] = fptr[indexreal];
+
+        index = coords_index(nlocal[X], nlocal[Y], 1);
+        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+        lb->hl .sendppn[count] = fptr[indexreal];
+
+        index = coords_index(nlocal[X], nlocal[Y], nlocal[Z]);
+        indexreal = LB_ADDR(lb->nsite, lb->ndist, NVEL, index, n, p);
+        lb->hl .sendppp[count] = fptr[indexreal];
+        count++;
+      }
+    }
+
+    MPI_Issend(&lb->hl .sendppp[0], nsend, MPI_DOUBLE, ppp, tagppp, comm, &lb->hl.sendreq[18]);
+    MPI_Issend(&lb->hl .sendppn[0], nsend, MPI_DOUBLE, ppn, tagppn, comm, &lb->hl.sendreq[19]);
+    MPI_Issend(&lb->hl .sendpnp[0], nsend, MPI_DOUBLE, pnp, tagpnp, comm, &lb->hl.sendreq[20]);
+    MPI_Issend(&lb->hl .sendpnn[0], nsend, MPI_DOUBLE, pnn, tagpnn, comm, &lb->hl.sendreq[21]);
+    MPI_Issend(&lb->hl .sendnpp[0], nsend, MPI_DOUBLE, npp, tagnpp, comm, &lb->hl.sendreq[22]);
+    MPI_Issend(&lb->hl .sendnpn[0], nsend, MPI_DOUBLE, npn, tagnpn, comm, &lb->hl.sendreq[23]);
+    MPI_Issend(&lb->hl .sendnnp[0], nsend, MPI_DOUBLE, nnp, tagnnp, comm, &lb->hl.sendreq[24]);
+    MPI_Issend(&lb->hl .sendnnn[0], nsend, MPI_DOUBLE, nnn, tagnnn, comm, &lb->hl.sendreq[25]);
+  }
   return;
 }
 
@@ -2434,5 +2494,3 @@ void unpack_halo_buffers(lb_t * lb) {
 
   return;
 }
-
-

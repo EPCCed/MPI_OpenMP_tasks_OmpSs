@@ -101,23 +101,4 @@ __targetHost__ void halo_edges(lb_t * lb);
 __targetHost__ void halo_corners(lb_t * lb);
 __targetHost__ void unpack_halo_buffers(lb_t * lb);
 
-//~~~~~~~~~~~~~~~~~~ TASKS ~~~~~~~~~~~~~~~
-__targetHost__ int lb_halo_via_copy_nonblocking_tasks_start(lb_t * lb);
-__targetHost__ int lb_halo_via_copy_nonblocking_tasks_end(lb_t * lb);
-__targetHost__ void halo_planes_tasks(lb_t * lb);
-__targetHost__ void halo_edges_tasks(lb_t * lb);
-__targetHost__ void halo_corners_tasks(lb_t * lb);
-//~~~~~~~~~~~~~~~~~~ Independent TASKS ~~~~~~~~~~~~~~~
-__targetHost__ void halo_planes_tasks_i(lb_t * lb, int n);
-__targetHost__ void halo_edges_tasks_i(lb_t * lb, int n);
-__targetHost__ void halo_corners_tasks_i(lb_t * lb, int n);
-__targetHost__ void unpack_halo_buffers_i(lb_t * lb, int id);
-
-__targetHost__ int prepareBuffersX(lb_t * lb, double* fptr,int* nlocal, int id);
-__targetHost__ int prepareBuffersY(lb_t * lb, double* fptr,int* nlocal, int id);
-__targetHost__ int prepareBuffersZ(lb_t * lb, double* fptr,int* nlocal, int id);
-
-__targetHost__ int edgeBuffers(lb_t * lb, double* fptr,int* nlocal, int id);
-//__targetHost__ void unpack_halo_buffers(lb_t * lb);
-
 #endif

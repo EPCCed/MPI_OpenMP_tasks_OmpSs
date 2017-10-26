@@ -72,15 +72,12 @@ __target__ int phi_lb_to_field_site(double * phi, double * f, const int baseInde
 
 __targetEntry__ void phi_lb_to_field_lattice(double * phi, lb_t * lb) {
 
-
   int baseIndex=0;
 
-  __targetTLP__(baseIndex,tc_nSites){
+  __targetTLP__(baseIndex,tc_nSites){	  
     phi_lb_to_field_site(phi, lb->f, baseIndex);
   }
-  
-  /* for(baseIndex=0; baseIndex < tc_nSites; baseIndex++) */
-  /*   phi_lb_to_field_site(phi, lb->f, baseIndex); */
+
 
   return;
 }

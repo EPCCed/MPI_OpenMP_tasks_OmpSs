@@ -16,7 +16,7 @@
 #include "../version.h"
 #include <mpi.h>
 #include "targetDP.h"
-
+#include <omp.h>
 typedef struct pe_s pe_t;
 
 __targetHost__ void pe_init(void);

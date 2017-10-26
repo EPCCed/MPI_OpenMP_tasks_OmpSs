@@ -21,8 +21,7 @@
 #include "svn.h"
 
 #if defined (SVN_REVISION)
-//static const char * svn_revision_ = SVN_REVISION;
-static const char * svn_revision_ = "madeup";
+static const char * svn_revision_ = "other";
 #else
 static const char * svn_revision_ = "unknown";
 #endif 

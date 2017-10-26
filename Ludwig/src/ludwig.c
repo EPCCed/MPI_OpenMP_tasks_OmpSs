@@ -203,6 +203,8 @@ static int ludwig_rt(ludwig_t * ludwig) {
   ran_init();
   hydro_rt(&ludwig->hydro);
 
+  /* PHI I/O */
+
   RUN_get_int_parameter_vector("default_io_grid", io_grid_default);
   for (n = 0; n < 3; n++) {
     io_grid[n] = io_grid_default[n];
@@ -448,20 +450,17 @@ void ludwig_run(const char * inputfile) {
 
 #ifdef KEEPHYDROONTARGET
 
-  copyDeepDoubleArrayToTarget(ludwig->hydro->tcopy,ludwig->hydro,&(ludwig->hydro->u),
-                              ludwig->hydro->nf*nSites);
+  copyDeepDoubleArrayToTarget(ludwig->hydro->tcopy,ludwig->hydro,&(ludwig->hydro->u),ludwig->hydro->nf*nSites);
 
 #endif
 
 #ifdef KEEPFIELDONTARGET
   if (ludwig->q){
-    copyDeepDoubleArrayToTarget(ludwig->q->tcopy,ludwig->q,&(ludwig->q->data),
-                                ludwig->q->nf*nSites);
+    copyDeepDoubleArrayToTarget(ludwig->q->tcopy,ludwig->q,&(ludwig->q->data),ludwig->q->nf*nSites);
 
   }
   if (ludwig->phi){
-    copyDeepDoubleArrayToTarget(ludwig->phi->tcopy,ludwig->phi,&(ludwig->phi->data),
-                                ludwig->phi->nf*nSites);
+    copyDeepDoubleArrayToTarget(ludwig->phi->tcopy,ludwig->phi,&(ludwig->phi->data),ludwig->phi->nf*nSites);
   }
 
 #endif
@@ -476,622 +475,612 @@ void ludwig_run(const char * inputfile) {
   /* sync tasks before main loop for timing purposes */
   MPI_Barrier(pe_comm());
 
-#ifdef TASKS
-#pragma omp parallel default(none) shared(ludwig,nSites,nFields,filename,subdirectory,step) \
-  private(tmpptr,ncolloid,im,multisteps,flag,uzero,iohandler,is_pm,is_subgrid,fzero)
-  {
-#pragma omp single
-    {
-#endif
-      while (next_step()) {
+  while (next_step()) {
 
 
-        TIMER_start(TIMER_STEPS);
+    TIMER_start(TIMER_STEPS);
 
-        step = get_step();
+    step = get_step();
 
-        //Yes
-        if (ludwig->hydro) {
-
+    if (ludwig->hydro) {
 #ifdef KEEPHYDROONTARGET
 
-          hydro_t* t_hydro = ludwig->hydro->tcopy;
-          copyFromTarget(&tmpptr,&(t_hydro->f),sizeof(double*));
-          targetZero(tmpptr,ludwig->hydro->nf*nSites);
+      hydro_t* t_hydro = ludwig->hydro->tcopy;
+      copyFromTarget(&tmpptr,&(t_hydro->f),sizeof(double*));
+      targetZero(tmpptr,ludwig->hydro->nf*nSites);
 
 #else
-          //executes
-          hydro_f_zero(ludwig->hydro, fzero);
+      hydro_f_zero(ludwig->hydro, fzero);
 #endif
 
-        }
+    }
 
 
-        colloids_info_ntotal(ludwig->collinfo, &ncolloid);
+    colloids_info_ntotal(ludwig->collinfo, &ncolloid);
 
-        ludwig_colloids_update(ludwig);
-
-
+    ludwig_colloids_update(ludwig);
 
 
-        /* Order parameter gradients */
+    /* Order parameter gradients */
 
-        TIMER_start(TIMER_PHI_GRADIENTS);
+    TIMER_start(TIMER_PHI_GRADIENTS);
 
-        /* if symmetric_lb store phi to field */
+    /* if symmetric_lb store phi to field */
 
-        lb_ndist(ludwig->lb, &im);
 
-        //im is always = 2
-        if (im == 2)    phi_lb_to_field(ludwig->phi, ludwig->lb->tcopy);
+    lb_ndist(ludwig->lb, &im);
 
 
 
-        //YES -  executes
-        if (ludwig->phi) {
+    if (im == 2) phi_lb_to_field(ludwig->phi, ludwig->lb->tcopy);
 
-        TIMER_start(TIMER_PHI_HALO);
+
+
+    if (ludwig->phi) {
+
+      TIMER_start(TIMER_PHI_HALO);
 
 
 #if defined (KEEPFIELDONTARGET) && defined (LB_DATA_SOA)
 
-        halo_alternative(1, 1, 0, ludwig->phi->t_data);
+      halo_alternative(1, 1, 0, ludwig->phi->t_data);
 
 #elif defined (KEEPFIELDONTARGET) //but not LB_DATA_SOA
 
-        halo_alternative(1, 1, 0, ludwig->phi->t_data);
+      halo_alternative(1, 1, 0, ludwig->phi->t_data);
 
 #elif defined (LB_DATA_SOA) //but not KEEPFIELDONTARGET
 
-        copyDeepDoubleArrayToTarget(ludwig->phi->tcopy,ludwig->phi,&(ludwig->phi->data),
-          ludwig->phi->nf*nSites);
+      copyDeepDoubleArrayToTarget(ludwig->phi->tcopy,ludwig->phi,
+				  &(ludwig->phi->data),ludwig->phi->nf*nSites);
 
-        halo_alternative(1, 1, 0, ludwig->phi->t_data);
+      halo_alternative(1, 1, 0, ludwig->phi->t_data);
 
 
-        copyDeepDoubleArrayFromTarget(ludwig->phi,ludwig->phi->tcopy,&(ludwig->phi->data),
-          ludwig->phi->nf*nSites);
+      copyDeepDoubleArrayFromTarget(ludwig->phi,ludwig->phi->tcopy,
+				    &(ludwig->phi->data),ludwig->phi->nf*nSites);
 
-	
+
+
 #else
-        //executes
-        //Main HALO EXCHANGE
-        field_halo(ludwig->phi);
+      field_halo(ludwig->phi);
 
 #endif
 
-        TIMER_stop(TIMER_PHI_HALO);
+      TIMER_stop(TIMER_PHI_HALO);
 
-        //this executes
-        field_grad_compute(ludwig->phi_grad);
+      field_grad_compute(ludwig->phi_grad);
+    }
+    if (ludwig->p) {
+      field_halo(ludwig->p);
+      field_grad_compute(ludwig->p_grad);
+    }
+    if (ludwig->q) {
+
+      TIMER_start(TIMER_PHI_HALO);
+
+      field_t* t_field = NULL;
+      t_field = ludwig->q->tcopy;
+      copyFromTarget(&tmpptr,&(t_field->data),sizeof(double*));
+
+#if defined (KEEPFIELDONTARGET) && defined (LB_DATA_SOA)
+
+      halo_alternative(ludwig->q->nf, 1, 0, tmpptr);
+
+#elif defined (KEEPFIELDONTARGET) //but not LB_DATA_SOA
+
+      halo_alternative(ludwig->q->nf, 1, 0, tmpptr);
+
+#elif defined (LB_DATA_SOA) //but not KEEPFIELDONTARGET
+
+      copyDeepDoubleArrayToTarget(ludwig->q->tcopy,ludwig->q,&(ludwig->q->data),
+				  ludwig->q->nf*nSites);
+
+      halo_alternative(ludwig->q->nf, 1, 0, tmpptr);
+
+      copyDeepDoubleArrayFromTarget(ludwig->q,ludwig->q->tcopy,&(ludwig->q->data),
+				    ludwig->q->nf*nSites);
+
+
+#else
+
+      field_halo(ludwig->q);
+
+#endif
+
+      TIMER_stop(TIMER_PHI_HALO);
+
+
+
+      field_grad_compute(ludwig->q_grad);
+      blue_phase_redshift_compute(); /* if redshift required? */
+    }
+
+    TIMER_stop(TIMER_PHI_GRADIENTS);
+
+
+    /* Electrokinetics (including electro/symmetric requiring above
+     * gradients for phi) */
+
+    if (ludwig->psi) {
+      /* Set charge distribution according to updated map */
+      psi_colloid_rho_set(ludwig->psi, ludwig->collinfo);
+
+      /* Poisson solve */
+
+      if(get_step() % psi_skipsteps(ludwig->psi) == 0){
+        TIMER_start(TIMER_ELECTRO_POISSON);
+#ifdef PETSC
+        psi_petsc_solve(ludwig->psi, ludwig->epsilon);
+#else
+        psi_sor_solve(ludwig->psi, ludwig->epsilon);
+#endif
+        TIMER_stop(TIMER_ELECTRO_POISSON);
       }
 
+      if (ludwig->hydro) {
+        TIMER_start(TIMER_HALO_LATTICE);
+        hydro_u_halo(ludwig->hydro);
+        TIMER_stop(TIMER_HALO_LATTICE);
+      }
 
-        //exectutes
-        if (ludwig->p) {
+      /* Time splitting for high electrokinetic diffusions in Nernst Planck */
 
-          field_halo(ludwig->p);
-          field_grad_compute(ludwig->p_grad);
-        }
-        //NO
-        if (ludwig->q) {
+      psi_multisteps(ludwig->psi, &multisteps);
 
-          TIMER_start(TIMER_PHI_HALO);
+      for (im = 0; im < multisteps; im++) {
 
-          field_t* t_field = NULL;
-          t_field = ludwig->q->tcopy;
-          copyFromTarget(&tmpptr,&(t_field->data),sizeof(double*));
+        TIMER_start(TIMER_HALO_LATTICE);
+        psi_halo_psi(ludwig->psi);
+        psi_halo_psijump(ludwig->psi);
+        psi_halo_rho(ludwig->psi);
+        TIMER_stop(TIMER_HALO_LATTICE);
 
-#if defined (KEEPFIELDONTARGET) && defined (LB_DATA_SOA)
-
-          halo_alternative(ludwig->q->nf, 1, 0, tmpptr);
-
-#elif defined (KEEPFIELDONTARGET) //but not LB_DATA_SOA
-
-          halo_alternative(ludwig->q->nf, 1, 0, tmpptr);
-
-#elif defined (LB_DATA_SOA) //but not KEEPFIELDONTARGET
-
-          copyDeepDoubleArrayToTarget(ludwig->q->tcopy,ludwig->q,&(ludwig->q->data),
-                                      ludwig->q->nf*nSites);
-
-          halo_alternative(ludwig->q->nf, 1, 0, tmpptr);
-
-          copyDeepDoubleArrayFromTarget(ludwig->q,ludwig->q->tcopy,&(ludwig->q->data),
-                                        ludwig->q->nf*nSites);
-
-
-#else
-
-          field_halo(ludwig->q);
-
-#endif
-
-          TIMER_stop(TIMER_PHI_HALO);
-
-
-          field_grad_compute(ludwig->q_grad);
-          blue_phase_redshift_compute(); /* if redshift required? */
-        }
-
-        TIMER_stop(TIMER_PHI_GRADIENTS);
-
-
-        /* Electrokinetics (including electro/symmetric requiring above
-         * gradients for phi) */
-
-        //No
-        if (ludwig->psi) {
-          /* Set charge distribution according to updated map */
-          psi_colloid_rho_set(ludwig->psi, ludwig->collinfo);
-
-          /* Poisson solve */
-
-          if(get_step() % psi_skipsteps(ludwig->psi) == 0){
-            TIMER_start(TIMER_ELECTRO_POISSON);
-#ifdef PETSC
-            psi_petsc_solve(ludwig->psi, ludwig->epsilon);
-#else
-            psi_sor_solve(ludwig->psi, ludwig->epsilon);
-#endif
-            TIMER_stop(TIMER_ELECTRO_POISSON);
-          }
-
-          if (ludwig->hydro) {
-
-            TIMER_start(TIMER_HALO_LATTICE);
-            hydro_u_halo(ludwig->hydro);
-            TIMER_stop(TIMER_HALO_LATTICE);
-          }
-
-          /* Time splitting for high electrokinetic diffusions in Nernst Planck */
-
-          psi_multisteps(ludwig->psi, &multisteps);
-
-          for (im = 0; im < multisteps; im++) {
-
-            TIMER_start(TIMER_HALO_LATTICE);
-            psi_halo_psi(ludwig->psi);
-            psi_halo_psijump(ludwig->psi);
-            psi_halo_rho(ludwig->psi);
-            TIMER_stop(TIMER_HALO_LATTICE);
-
-            /* Force calculation is only once per LB timestep */
-            if (im == 0) {
-
-              TIMER_start(TIMER_FORCE_CALCULATION);
-              psi_force_is_divergence(&flag);
-
-              /* Force input as gradient of chemical potential
-                 with integrated momentum correction       */
-              if (flag == 0) {
-                psi_force_gradmu(ludwig->psi, ludwig->phi, ludwig->hydro,
-                                 ludwig->map, ludwig->collinfo);
-              }
-
-              /* Force calculation as divergence of stress tensor */
-              if (flag == 1) {
-                psi_force_divstress_d3qx(ludwig->psi, ludwig->hydro,
-                                         ludwig->map, ludwig->collinfo);
-              }
-              TIMER_stop(TIMER_FORCE_CALCULATION);
-
-            }
-
-            TIMER_start(TIMER_ELECTRO_NPEQ);
-            nernst_planck_driver_d3qx(ludwig->psi, ludwig->hydro, ludwig->map, ludwig->collinfo);
-            TIMER_stop(TIMER_ELECTRO_NPEQ);
-
-          }
-
-          TIMER_start(TIMER_HALO_LATTICE);
-          psi_halo_psi(ludwig->psi);
-          psi_halo_psijump(ludwig->psi);
-          psi_halo_rho(ludwig->psi);
-          TIMER_stop(TIMER_HALO_LATTICE);
-
-          nernst_planck_adjust_multistep(ludwig->psi);
-
-          if (is_statistics_step()) info("%d multisteps\n",im);
-
-          psi_zero_mean(ludwig->psi);
-
-        }//end ludwig->psi
-
-
-
-        /* order parameter dynamics (not if symmetric_lb) */
-
-        lb_ndist(ludwig->lb, &im);
-        //Executes im=2
-        if (im == 2) {
-          /* dynamics are dealt with at the collision stage (below) */
-        }
-        //NO
-        else {
+        /* Force calculation is only once per LB timestep */
+        if (im == 0) {
 
           TIMER_start(TIMER_FORCE_CALCULATION);
+          psi_force_is_divergence(&flag);
 
-          if (ludwig->psi) {
-            /* Force in electrokinetic models is computed above */
-          }
-          else {
-            if (ncolloid == 0) {
-              /* Force calculation as divergence of stress tensor */
-              phi_force_calculation(ludwig->phi, ludwig->q, ludwig->q_grad, ludwig->hydro);
-              /* LC-droplet requires partial body force input and momentum correction */
-              if (ludwig->q && ludwig->phi) {
-                lc_droplet_bodyforce(ludwig->hydro);
-                hydro_correct_momentum(ludwig->hydro);
-              }
-            }
-            else {
-              phi_force_colloid(ludwig->collinfo, ludwig->q, ludwig->q_grad,ludwig->hydro,
-                                ludwig->map);
-            }
+          /* Force input as gradient of chemical potential
+             with integrated momentum correction       */
+          if (flag == 0) {
+            psi_force_gradmu(ludwig->psi, ludwig->phi, ludwig->hydro,
+                             ludwig->map, ludwig->collinfo);
           }
 
+          /* Force calculation as divergence of stress tensor */
+          if (flag == 1) {
+            psi_force_divstress_d3qx(ludwig->psi, ludwig->hydro,
+                                     ludwig->map, ludwig->collinfo);
+          }
           TIMER_stop(TIMER_FORCE_CALCULATION);
 
-          TIMER_start(TIMER_ORDER_PARAMETER_UPDATE);
-          //executes
-          if (ludwig->phi) phi_cahn_hilliard(ludwig->phi, ludwig->hydro,
-                                             ludwig->map, ludwig->noise_phi);
-          //executes
-          if (ludwig->p) leslie_ericksen_update(ludwig->p, ludwig->hydro);
-          //No
-          if (ludwig->q) {
-            if (ludwig->hydro) {
+        }
 
-              TIMER_start(TIMER_U_HALO);
+        TIMER_start(TIMER_ELECTRO_NPEQ);
+        nernst_planck_driver_d3qx(ludwig->psi, ludwig->hydro, ludwig->map,
+				  ludwig->collinfo);
+        TIMER_stop(TIMER_ELECTRO_NPEQ);
 
-              hydro_t* t_hydro = ludwig->hydro->tcopy;
-              copyFromTarget(&tmpptr,&(t_hydro->u),sizeof(double*));
+      }
+
+      TIMER_start(TIMER_HALO_LATTICE);
+      psi_halo_psi(ludwig->psi);
+      psi_halo_psijump(ludwig->psi);
+      psi_halo_rho(ludwig->psi);
+      TIMER_stop(TIMER_HALO_LATTICE);
+
+      nernst_planck_adjust_multistep(ludwig->psi);
+
+      if (is_statistics_step()) info("%d multisteps\n",im);
+
+      psi_zero_mean(ludwig->psi);
+
+    }
+
+
+
+    /* order parameter dynamics (not if symmetric_lb) */
+
+    lb_ndist(ludwig->lb, &im);
+    if (im == 2) {
+      /* dynamics are dealt with at the collision stage (below) */
+    }
+    else {
+
+      TIMER_start(TIMER_FORCE_CALCULATION);
+
+      if (ludwig->psi) {
+        /* Force in electrokinetic models is computed above */
+      }
+      else {
+        if (ncolloid == 0) {
+          /* Force calculation as divergence of stress tensor */
+          phi_force_calculation(ludwig->phi, ludwig->q,
+                                ludwig->q_grad, ludwig->hydro);
+          /* LC-droplet requires partial body force input and momentum correction */
+          if (ludwig->q && ludwig->phi) {
+            lc_droplet_bodyforce(ludwig->hydro);
+            hydro_correct_momentum(ludwig->hydro);
+          }
+        }
+        else {
+          phi_force_colloid(ludwig->collinfo, ludwig->q, ludwig->q_grad,
+			    ludwig->hydro, ludwig->map);
+        }
+      }
+
+      TIMER_stop(TIMER_FORCE_CALCULATION);
+
+      TIMER_start(TIMER_ORDER_PARAMETER_UPDATE);
+
+      if (ludwig->phi) phi_cahn_hilliard(ludwig->phi, ludwig->hydro,
+                                         ludwig->map, ludwig->noise_phi);
+      if (ludwig->p) leslie_ericksen_update(ludwig->p, ludwig->hydro);
+
+      if (ludwig->q) {
+        if (ludwig->hydro) {
+
+          TIMER_start(TIMER_U_HALO);
+
+          hydro_t* t_hydro = ludwig->hydro->tcopy;
+          copyFromTarget(&tmpptr,&(t_hydro->u),sizeof(double*));
 
 #if defined (KEEPHYDROONTARGET) && defined (LB_DATA_SOA)
 
-              halo_alternative(ludwig->hydro->nf, 1, 0, tmpptr);
+          halo_alternative(ludwig->hydro->nf, 1, 0, tmpptr);
 
 #elif defined (KEEPHYDROONTARGET) //but not LB_DATA_SOA
 
-              halo_alternative(ludwig->hydro->nf, 1, 0, tmpptr);
+          halo_alternative(ludwig->hydro->nf, 1, 0, tmpptr);
 
 #elif defined (LB_DATA_SOA) //but not KEEPHYDROONTARGET
 
 
-              copyDeepDoubleArrayToTarget(ludwig->hydro->tcopy,ludwig->hydro,&(ludwig->hydro->u),
-                                          ludwig->hydro->nf*nSites);
+          copyDeepDoubleArrayToTarget(ludwig->hydro->tcopy,ludwig->hydro,
+                                      &(ludwig->hydro->u),ludwig->hydro->nf*nSites);
 
-              halo_alternative(ludwig->hydro->nf, 1, 0, tmpptr);
+          halo_alternative(ludwig->hydro->nf, 1, 0, tmpptr);
 
-              copyDeepDoubleArrayFromTarget(ludwig->hydro,ludwig->hydro->tcopy,&(ludwig->hydro->u),
-                                            ludwig->hydro->nf*nSites);
+          copyDeepDoubleArrayFromTarget(ludwig->hydro,ludwig->hydro->tcopy,
+                                        &(ludwig->hydro->u),ludwig->hydro->nf*nSites);
 
 #else
 
-              hydro_u_halo(ludwig->hydro);
+          hydro_u_halo(ludwig->hydro);
 
 #endif
 
-              TIMER_stop(TIMER_U_HALO);
-            }
+          TIMER_stop(TIMER_U_HALO);
+        }
 
-            colloids_fix_swd(ludwig->collinfo, ludwig->hydro, ludwig->map);
-            blue_phase_beris_edwards(ludwig->q, ludwig->q_grad, ludwig->hydro,
-                                     ludwig->map, ludwig->noise_rho);
-          }
+        colloids_fix_swd(ludwig->collinfo, ludwig->hydro, ludwig->map);
+        blue_phase_beris_edwards(ludwig->q, ludwig->q_grad, ludwig->hydro,
+                                 ludwig->map, ludwig->noise_rho);
+      }
 
-          TIMER_stop(TIMER_ORDER_PARAMETER_UPDATE);
-        }//end of if-else (im=2)
+      TIMER_stop(TIMER_ORDER_PARAMETER_UPDATE);
+    }
 
 
-        //executes
-        if (ludwig->hydro) {
-          /* Zero velocity field here, as velocity at collision is used
-           * at next time step for FD above. Strictly, we only need to
-           * do this if velocity output is required in presence of
-           * colloids to present non-zero u inside particles. */
+
+    if (ludwig->hydro) {
+      /* Zero velocity field here, as velocity at collision is used
+       * at next time step for FD above. Strictly, we only need to
+       * do this if velocity output is required in presence of
+       * colloids to present non-zero u inside particles. */
 
 #ifdef KEEPHYDROONTARGET
-          hydro_t* t_hydro = ludwig->hydro->tcopy;
-          copyFromTarget(&tmpptr,&(t_hydro->u),sizeof(double*));
-          targetZero(tmpptr,ludwig->hydro->nf*nSites);
+      hydro_t* t_hydro = ludwig->hydro->tcopy;
+      copyFromTarget(&tmpptr,&(t_hydro->u),sizeof(double*));
+      targetZero(tmpptr,ludwig->hydro->nf*nSites);
 
 #else
-          //executes
-          hydro_u_zero(ludwig->hydro, uzero);
+      hydro_u_zero(ludwig->hydro, uzero);
 #endif
 
 
-          /* Collision stage */
-          //executes
-          TIMER_start(TIMER_COLLIDE);
+      /* Collision stage */
+
+      TIMER_start(TIMER_COLLIDE);
+#pragma omp parallel default(none) shared(ludwig)
+      {
+#pragma omp master
+        {
           lb_collide(ludwig->lb->tcopy, ludwig->hydro, ludwig->map, ludwig->noise_rho);
-          TIMER_stop(TIMER_COLLIDE);
+        }
+      }
+
+      TIMER_stop(TIMER_COLLIDE);
 
 
 
-          /* Boundary conditions */
-          //executes
-          lb_le_apply_boundary_conditions(ludwig->lb->tcopy);
+      /* Boundary conditions */
+
+      lb_le_apply_boundary_conditions(ludwig->lb->tcopy);
 
 
 
-          TIMER_start(TIMER_HALO_LATTICE);
+      TIMER_start(TIMER_HALO_LATTICE);
 
 #if defined (KEEPFIELDONTARGET) || defined (LB_DATA_SOA)
-          copyFromTarget(&tmpptr,&(ludwig->lb->tcopy->f),sizeof(double*));
-          halo_alternative(NVEL, ludwig->lb->ndist, 1, tmpptr);
+      copyFromTarget(&tmpptr,&(ludwig->lb->tcopy->f),sizeof(double*));
+      halo_alternative(NVEL, ludwig->lb->ndist, 1, tmpptr);
 #else
-          //executes
-          lb_halo(ludwig->lb);
+      lb_halo(ludwig->lb);
 #endif
 
 
-          TIMER_stop(TIMER_HALO_LATTICE);
+
+      TIMER_stop(TIMER_HALO_LATTICE);
 
 
-          /* Colloid bounce-back applied between collision and
-           * propagation steps. */
 
-          //executes is_subgrid=yes
-          if (is_subgrid) {
-#pragma omp task
-            subgrid_update(ludwig->collinfo, ludwig->hydro);
-          }
-          else {
-            //TODO:Work oout dependencies in this section
-#pragma omp taskwait
-            TIMER_start(TIMER_BBL);
-            wall_set_wall_velocity(ludwig->lb->tcopy);
-            bounce_back_on_links(ludwig->bbl, ludwig->lb, ludwig->collinfo);
-            wall_bounce_back(ludwig->lb->tcopy, ludwig->map);
-            TIMER_stop(TIMER_BBL);
-          }
-        }// end of if(ludwig->hydro)
 
-        else {
-          /* No hydrodynamics, but update colloids in response to
-           * external forces. */
 
-          //TODO:Work out dependencies in this section
-          bbl_update_colloids(ludwig->bbl, ludwig->collinfo);
-        }
+      /* Colloid bounce-back applied between collision and
+       * propagation steps. */
 
-        //#pragma omp taskwait
-
-        /* There must be no halo updates between bounce back
-         * and propagation, as the halo regions are active */
-        //executes
-        if (ludwig->hydro) {
-          TIMER_start(TIMER_PROPAGATE);
-          lb_propagation(ludwig->lb->tcopy);
-          TIMER_stop(TIMER_PROPAGATE);
-        }
-        TIMER_stop(TIMER_STEPS);
-
-#pragma omp taskwait
-
-        /* Configuration dump */
-
-        if (is_config_step()) {
-          copyDeepDoubleArrayFromTarget(ludwig->lb,ludwig->lb->tcopy,&(ludwig->lb->f),
-                                        nSites*nFields);
-
-          info("Writing distribution output at step %d!\n", step);
-          sprintf(filename, "%sdist-%8.8d", subdirectory, step);
-          lb_io_info(ludwig->lb, &iohandler);
-          io_write_data(iohandler, filename, ludwig->lb);
-        }
-
-        /* is_measurement_step() is here to prevent 'breaking' old input
-         * files; it should really be removed. */
-
-        if (is_config_step() || is_measurement_step() || is_colloid_io_step()) {
-          if (ncolloid > 0) {
-            info("Writing colloid output at step %d!\n", step);
-            sprintf(filename, "%s%s%8.8d", subdirectory, "config.cds", step);
-            colloid_io_write(ludwig->cio, filename);
-          }
-        }
-
-        if (is_phi_output_step() || is_config_step()) {
-
-          if (ludwig->phi) {
-            field_io_info(ludwig->phi, &iohandler);
-            info("Writing phi file at step %d!\n", step);
-            sprintf(filename,"%sphi-%8.8d", subdirectory, step);
-            io_write_data(iohandler, filename, ludwig->phi);
-          }
-          if (ludwig->q) {
-            field_io_info(ludwig->q, &iohandler);
-            info("Writing q file at step %d!\n", step);
-            sprintf(filename,"%sq-%8.8d", subdirectory, step);
-            io_write_data(iohandler, filename, ludwig->q);
-          }
-        }
-
-        if (is_psi_output_step()) {
-          if (ludwig->psi) {
-            psi_io_info(ludwig->psi, &iohandler);
-            info("Writing psi file at step %d!\n", step);
-            sprintf(filename,"%spsi-%8.8d", subdirectory, step);
-            io_write_data(iohandler, filename, ludwig->psi);
-          }
-        }
-
-        /* Measurements */
-
-        if (is_measurement_step()) {
-          stats_sigma_measure(ludwig->phi, step);
-        }
-
-        if (is_shear_measurement_step()) {
-          copyDeepDoubleArrayFromTarget(ludwig->lb,ludwig->lb->tcopy,&(ludwig->lb->f),
-                                        nSites*nFields);
-
-          stats_rheology_stress_profile_accumulate(ludwig->lb, ludwig->hydro);
-        }
-
-        if (is_shear_output_step()) {
-          sprintf(filename, "%sstr-%8.8d.dat", subdirectory, step);
-          stats_rheology_stress_section(filename);
-          stats_rheology_stress_profile_zero();
-        }
-
-        if (is_vel_output_step() || is_config_step()) {
-          hydro_io_info(ludwig->hydro, &iohandler);
-          info("Writing velocity output at step %d!\n", step);
-          sprintf(filename, "%svel-%8.8d", subdirectory, step);
-          io_write_data(iohandler, filename, ludwig->hydro);
-        }
-
-        if (fe_set() && is_fed_output_step()) {
-          fed_io_info(&iohandler);
-          info("Writing free energy density output at step %d!\n", step);
-          sprintf(filename, "%sfed-%8.8d", subdirectory, step);
-          /* the ludwig->q is not used by the function, but a pointer is needed*/
-          io_write_data(iohandler, filename, ludwig->q);
-        }
-
-        /* Print progress report */
-
-        if (is_statistics_step()) {
-
-          copyDeepDoubleArrayFromTarget(ludwig->lb,ludwig->lb->tcopy,&(ludwig->lb->f),
-                                        nSites*nFields);
-
-          stats_distribution_print(ludwig->lb, ludwig->map);
-          lb_ndist(ludwig->lb, &im);
-          if (im == 2) {
-            phi_lb_to_field_host(ludwig->phi, ludwig->lb);
-            stats_field_info_bbl(ludwig->phi, ludwig->map, ludwig->bbl);
-          }
-          else {
-            if (ludwig->phi) stats_field_info(ludwig->phi, ludwig->map);
-          }
-          if (ludwig->p)   stats_field_info(ludwig->p, ludwig->map);
-          if (ludwig->q)   stats_field_info(ludwig->q, ludwig->map);
-
-          if (ludwig->psi) {
-            double psi_zeta;
-            psi_colloid_rho_set(ludwig->psi, ludwig->collinfo);
-            psi_stats_info(ludwig->psi);
-            /* Zeta potential for one colloid only to follow psi_stats()*/
-            psi_colloid_zetapotential(ludwig->psi, ludwig->collinfo, &psi_zeta);
-            if (ncolloid == 1) info("[psi_zeta] %14.7e\n",  psi_zeta);
-          }
-
-          stats_free_energy_density(ludwig->q, ludwig->map, ncolloid);
-          //      blue_phase_stats(ludwig->q, ludwig->q_grad, ludwig->map, step);
-          ludwig_report_momentum(ludwig);
-
-          if (ludwig->hydro) {
-            wall_pm(&is_pm);
-            stats_velocity_minmax(ludwig->hydro, ludwig->map, is_pm);
-          }
-
-          lb_collision_stats_kt(ludwig->lb, ludwig->noise_rho, ludwig->map);
-
-          info("\nCompleted cycle %d\n", step);
-        }
-
-        stats_calibration_accumulate(ludwig->collinfo, step, ludwig->hydro,
-                                     ludwig->map);
-
-        /* Next time step */
+      if (is_subgrid) {
+        subgrid_update(ludwig->collinfo, ludwig->hydro);
+      }
+      else {
+        TIMER_start(TIMER_BBL);
+        wall_set_wall_velocity(ludwig->lb->tcopy);
+        bounce_back_on_links(ludwig->bbl, ludwig->lb, ludwig->collinfo);
+        wall_bounce_back(ludwig->lb->tcopy, ludwig->map);
+        TIMER_stop(TIMER_BBL);
+      }
     }
-#ifdef TASKS
-  }//omp single
-}//omp parallel
-#endif
+    else {
+      /* No hydrodynamics, but update colloids in response to
+       * external forces. */
+
+      bbl_update_colloids(ludwig->bbl, ludwig->collinfo);
+    }
+
+
+
+
+    /* There must be no halo updates between bounce back
+     * and propagation, as the halo regions are active */
+
+    if (ludwig->hydro) {
+      TIMER_start(TIMER_PROPAGATE);
+
+#pragma omp parallel default(none) shared(ludwig)
+      {
+#pragma omp master
+        {
+          lb_propagation(ludwig->lb->tcopy);
+        }//master
+      }//parallel
+
+      TIMER_stop(TIMER_PROPAGATE);
+    }
+
+    TIMER_stop(TIMER_STEPS);
+
+    /* Configuration dump */
+
+    if (is_config_step()) {
+      copyDeepDoubleArrayFromTarget(ludwig->lb,ludwig->lb->tcopy,
+				    &(ludwig->lb->f),nSites*nFields);
+
+      info("Writing distribution output at step %d!\n", step);
+      sprintf(filename, "%sdist-%8.8d", subdirectory, step);
+      lb_io_info(ludwig->lb, &iohandler);
+      io_write_data(iohandler, filename, ludwig->lb);
+    }
+
+    /* is_measurement_step() is here to prevent 'breaking' old input
+     * files; it should really be removed. */
+
+    if (is_config_step() || is_measurement_step() || is_colloid_io_step()) {
+      if (ncolloid > 0) {
+        info("Writing colloid output at step %d!\n", step);
+        sprintf(filename, "%s%s%8.8d", subdirectory, "config.cds", step);
+        colloid_io_write(ludwig->cio, filename);
+      }
+    }
+
+    if (is_phi_output_step() || is_config_step()) {
+
+      if (ludwig->phi) {
+        field_io_info(ludwig->phi, &iohandler);
+        info("Writing phi file at step %d!\n", step);
+        sprintf(filename,"%sphi-%8.8d", subdirectory, step);
+        io_write_data(iohandler, filename, ludwig->phi);
+      }
+      if (ludwig->q) {
+        field_io_info(ludwig->q, &iohandler);
+        info("Writing q file at step %d!\n", step);
+        sprintf(filename,"%sq-%8.8d", subdirectory, step);
+        io_write_data(iohandler, filename, ludwig->q);
+      }
+    }
+
+    if (is_psi_output_step()) {
+      if (ludwig->psi) {
+        psi_io_info(ludwig->psi, &iohandler);
+        info("Writing psi file at step %d!\n", step);
+        sprintf(filename,"%spsi-%8.8d", subdirectory, step);
+        io_write_data(iohandler, filename, ludwig->psi);
+      }
+    }
+
+    /* Measurements */
+
+    if (is_measurement_step()) {
+      stats_sigma_measure(ludwig->phi, step);
+    }
+
+    if (is_shear_measurement_step()) {
+      copyDeepDoubleArrayFromTarget(ludwig->lb,ludwig->lb->tcopy,
+				    &(ludwig->lb->f),nSites*nFields);
+
+      stats_rheology_stress_profile_accumulate(ludwig->lb, ludwig->hydro);
+    }
+
+    if (is_shear_output_step()) {
+      sprintf(filename, "%sstr-%8.8d.dat", subdirectory, step);
+      stats_rheology_stress_section(filename);
+      stats_rheology_stress_profile_zero();
+    }
+
+    if (is_vel_output_step() || is_config_step()) {
+      hydro_io_info(ludwig->hydro, &iohandler);
+      info("Writing velocity output at step %d!\n", step);
+      sprintf(filename, "%svel-%8.8d", subdirectory, step);
+      io_write_data(iohandler, filename, ludwig->hydro);
+    }
+
+    if (fe_set() && is_fed_output_step()) {
+      fed_io_info(&iohandler);
+      info("Writing free energy density output at step %d!\n", step);
+      sprintf(filename, "%sfed-%8.8d", subdirectory, step);
+      io_write_data(iohandler, filename, ludwig->q);
+      /* the ludwig->q is not used by the function, but a pointer is needed*/
+    }
+
+    /* Print progress report */
+
+    if (is_statistics_step()) {
+
+      copyDeepDoubleArrayFromTarget(ludwig->lb,ludwig->lb->tcopy,
+				    &(ludwig->lb->f),nSites*nFields);
+
+      stats_distribution_print(ludwig->lb, ludwig->map);
+      lb_ndist(ludwig->lb, &im);
+      if (im == 2) {
+        phi_lb_to_field_host(ludwig->phi, ludwig->lb);
+        stats_field_info_bbl(ludwig->phi, ludwig->map, ludwig->bbl);
+      }
+      else {
+        if (ludwig->phi) stats_field_info(ludwig->phi, ludwig->map);
+      }
+      if (ludwig->p)   stats_field_info(ludwig->p, ludwig->map);
+      if (ludwig->q)   stats_field_info(ludwig->q, ludwig->map);
+
+      if (ludwig->psi) {
+        double psi_zeta;
+        psi_colloid_rho_set(ludwig->psi, ludwig->collinfo);
+        psi_stats_info(ludwig->psi);
+        /* Zeta potential for one colloid only to follow psi_stats()*/
+        psi_colloid_zetapotential(ludwig->psi, ludwig->collinfo, &psi_zeta);
+        if (ncolloid == 1) info("[psi_zeta] %14.7e\n",  psi_zeta);
+      }
+
+      stats_free_energy_density(ludwig->q, ludwig->map, ncolloid);
+      //      blue_phase_stats(ludwig->q, ludwig->q_grad, ludwig->map, step);
+      ludwig_report_momentum(ludwig);
+
+      if (ludwig->hydro) {
+        wall_pm(&is_pm);
+        stats_velocity_minmax(ludwig->hydro, ludwig->map, is_pm);
+      }
+
+      lb_collision_stats_kt(ludwig->lb, ludwig->noise_rho, ludwig->map);
+
+      info("\nCompleted cycle %d\n", step);
+    }
+
+    stats_calibration_accumulate(ludwig->collinfo, step, ludwig->hydro,
+                                 ludwig->map);
+
+
+
+
+    /* Next time step */
+  }
 
   /* To prevent any conflict between the last regular dump, and
    * a final dump, there's a barrier here. */
 
   MPI_Barrier(pe_comm());
 
-/* Dump the final configuration if required. */
+  /* Dump the final configuration if required. */
 
-if (is_config_at_end()) {
-  copyDeepDoubleArrayFromTarget(ludwig->lb,ludwig->lb->tcopy,&(ludwig->lb->f),
-                                nSites*nFields);
+  if (is_config_at_end()) {
+    copyDeepDoubleArrayFromTarget(ludwig->lb,ludwig->lb->tcopy,
+				  &(ludwig->lb->f),nSites*nFields);
 
-  sprintf(filename, "%sdist-%8.8d", subdirectory, step);
-  lb_io_info(ludwig->lb, &iohandler);
-  io_write_data(iohandler, filename, ludwig->lb);
-  sprintf(filename, "%s%s%8.8d", subdirectory, "config.cds", step);
+    sprintf(filename, "%sdist-%8.8d", subdirectory, step);
+    lb_io_info(ludwig->lb, &iohandler);
+    io_write_data(iohandler, filename, ludwig->lb);
+    sprintf(filename, "%s%s%8.8d", subdirectory, "config.cds", step);
 
-  if (ncolloid > 0) colloid_io_write(ludwig->cio, filename);
+    if (ncolloid > 0) colloid_io_write(ludwig->cio, filename);
 
-  if (ludwig->phi) {
-    field_io_info(ludwig->phi, &iohandler);
-    info("Writing phi file at step %d!\n", step);
-    sprintf(filename,"%sphi-%8.8d", subdirectory, step);
-    io_write_data(iohandler, filename, ludwig->phi);
-  }
+    if (ludwig->phi) {
+      field_io_info(ludwig->phi, &iohandler);
+      info("Writing phi file at step %d!\n", step);
+      sprintf(filename,"%sphi-%8.8d", subdirectory, step);
+      io_write_data(iohandler, filename, ludwig->phi);
+    }
 
-  if (ludwig->q) {
-    field_io_info(ludwig->q, &iohandler);
-    info("Writing q file at step %d!\n", step);
-    sprintf(filename,"%sq-%8.8d", subdirectory, step);
-    io_write_data(iohandler, filename, ludwig->q);
-  }
-  /* Only strictly required if have order parameter dynamics */
-  if (ludwig->hydro) {
+    if (ludwig->q) {
+      field_io_info(ludwig->q, &iohandler);
+      info("Writing q file at step %d!\n", step);
+      sprintf(filename,"%sq-%8.8d", subdirectory, step);
+      io_write_data(iohandler, filename, ludwig->q);
+    }
+    /* Only strictly required if have order parameter dynamics */
+    if (ludwig->hydro) {
 
 #ifdef KEEPHYDROONTARGET
-    copyDeepDoubleArrayFromTarget(ludwig->hydro,ludwig->hydro->tcopy,&(ludwig->hydro->u),
-                                  ludwig->hydro->nf*nSites);
+      copyDeepDoubleArrayFromTarget(ludwig->hydro,ludwig->hydro->tcopy,
+				    &(ludwig->hydro->u),ludwig->hydro->nf*nSites);
 #endif
 
-    hydro_io_info(ludwig->hydro, &iohandler);
-    info("Writing velocity output at step %d!\n", step);
-    sprintf(filename, "%svel-%8.8d", subdirectory, step);
-    io_write_data(iohandler, filename, ludwig->hydro);
+      hydro_io_info(ludwig->hydro, &iohandler);
+      info("Writing velocity output at step %d!\n", step);
+      sprintf(filename, "%svel-%8.8d", subdirectory, step);
+      io_write_data(iohandler, filename, ludwig->hydro);
+    }
+    if (ludwig->psi) {
+      psi_io_info(ludwig->psi, &iohandler);
+      info("Writing psi file at step %d!\n", step);
+      sprintf(filename,"%spsi-%8.8d", subdirectory, step);
+      io_write_data(iohandler, filename, ludwig->psi);
+    }
   }
-  if (ludwig->psi) {
-    psi_io_info(ludwig->psi, &iohandler);
-    info("Writing psi file at step %d!\n", step);
-    sprintf(filename,"%spsi-%8.8d", subdirectory, step);
-    io_write_data(iohandler, filename, ludwig->psi);
-  }
- }
 
-/* Shut down cleanly. Give the timer statistics. Finalise PE. */
+  /* Shut down cleanly. Give the timer statistics. Finalise PE. */
 #ifdef PETSC
-if (ludwig->psi) psi_petsc_finish();
+  if (ludwig->psi) psi_petsc_finish();
 #endif
 
 #if defined(LB_DATA_SOA) ||  defined(KEEPFIELDONTARGET) ||  defined(KEEPHYDROONTARGET)
-finalise_comms_gpu();
+  finalise_comms_gpu();
 #endif
 
-stats_rheology_finish();
-stats_turbulent_finish();
-stats_calibration_finish();
+  stats_rheology_finish();
+  stats_turbulent_finish();
+  stats_calibration_finish();
 
-wall_finish();
+  wall_finish();
 
-if (ludwig->phi_grad) field_grad_free(ludwig->phi_grad);
-if (ludwig->p_grad)   field_grad_free(ludwig->p_grad);
-if (ludwig->q_grad)   field_grad_free(ludwig->q_grad);
-if (ludwig->phi)      field_free(ludwig->phi);
-if (ludwig->p)        field_free(ludwig->p);
-if (ludwig->q)        field_free(ludwig->q);
+  if (ludwig->phi_grad) field_grad_free(ludwig->phi_grad);
+  if (ludwig->p_grad)   field_grad_free(ludwig->p_grad);
+  if (ludwig->q_grad)   field_grad_free(ludwig->q_grad);
+  if (ludwig->phi)      field_free(ludwig->phi);
+  if (ludwig->p)        field_free(ludwig->p);
+  if (ludwig->q)        field_free(ludwig->q);
 
-bbl_free(ludwig->bbl);
-colloids_info_free(ludwig->collinfo);
+  bbl_free(ludwig->bbl);
+  colloids_info_free(ludwig->collinfo);
 
-if (ludwig->noise_phi) noise_free(ludwig->noise_phi);
-if (ludwig->noise_rho) noise_free(ludwig->noise_rho);
+  if (ludwig->noise_phi) noise_free(ludwig->noise_phi);
+  if (ludwig->noise_rho) noise_free(ludwig->noise_rho);
 
-TIMER_stop(TIMER_TOTAL);
-TIMER_statistics();
+  TIMER_stop(TIMER_TOTAL);
+  TIMER_statistics();
 
-pe_finalise();
+  pe_finalise();
 
-return;
+  return;
 }
 
 /*****************************************************************************
@@ -1728,7 +1717,6 @@ int ludwig_colloids_update(ludwig_t * ludwig) {
   assert(ludwig);
 
   colloids_info_ntotal(ludwig->collinfo, &ncolloid);
-  //TODO: current input data gives ncolloid=0, so this function finishes here
   if (ncolloid == 0) return 0;
 
   subgrid_on(&is_subgrid);
@@ -1746,7 +1734,6 @@ int ludwig_colloids_update(ludwig_t * ludwig) {
   TIMER_stop(TIMER_PARTICLE_HALO);
 
   if (is_subgrid) {
-
     interact_compute(ludwig->interact, ludwig->collinfo, ludwig->map,
                      ludwig->psi, ludwig->ewald);
     subgrid_force_from_particles(ludwig->collinfo, ludwig->hydro);
@@ -1755,7 +1742,6 @@ int ludwig_colloids_update(ludwig_t * ludwig) {
 
     /* Removal or replacement of fluid requires a lattice halo update */
 
-    //TODO: TASKS implementation here. It does not get executed now
     TIMER_start(TIMER_FREE1);
     if (iconserve && ludwig->phi) field_halo(ludwig->phi);
     if (iconserve && ludwig->psi) psi_halo_rho(ludwig->psi);

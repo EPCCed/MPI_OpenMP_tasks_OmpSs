@@ -28,12 +28,13 @@ ifeq ($(PE_ENV), GNU)
   CFLAGS_EXTRA= -g -Wall -pedantic -std=c99 -fopenmp -ftree-vectorizer-verbose=1 
 endif
 
+CFLAGS_EXTRA= -g -Wall -pedantic -std=c99 -fopenmp -ftree-vectorizer-verbose=1 
 
 # CC=cc
 # MPICC=cc
-CC=cc
-MPICC=cc
-CFLAGS=-O0 $(CFLAGS_EXTRA)
+CC=mpicc
+MPICC=mpicc
+CFLAGS=-O2 $(CFLAGS_EXTRA)
 
 LAUNCH_SERIAL_CMD=aprun -q -n 1
 LAUNCH_MPI_CMD=aprun -q

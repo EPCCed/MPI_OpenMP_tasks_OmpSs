@@ -459,10 +459,10 @@ __target__ void lb_collision_mrt_site( double* __restrict__ t_f,
 
   /* fast version, but doesn't support noise or non-fluid status yet */
   //__targetEntry__ void lb_collision_mrt_lattice_fast( double* __restrict__ t_f, 
-__targetEntry__ void lb_collision_mrt_lattice_fast( lb_t* lb, 
-				       const double* __restrict__ t_force, 
-				       double* __restrict__ t_velocity,
-				       const int nSites){
+  __targetEntry__ void lb_collision_mrt_lattice_fast( lb_t* lb, 
+						      const double* __restrict__ t_force, 
+						      double* __restrict__ t_velocity,
+						      const int nSites){
   
 
 
@@ -506,7 +506,8 @@ __targetEntry__ void lb_collision_mrt_lattice_fast( lb_t* lb,
   for (m = 0; m < tc_nmodes_; m++) {
     __targetILP__(iv) mode[m*VVL+iv] = 0.0;
     for (p = 0; p < NVEL; p++) {
-      __targetILP__(iv) mode[m*VVL+iv] += t_f[ LB_ADDR(tc_nSites, 1, NVEL, baseIndex + iv, 0, p) ]*tc_ma_[m][p];
+      __targetILP__(iv) mode[m*VVL+iv] += t_f[ LB_ADDR(tc_nSites, 1, NVEL, 
+						       baseIndex + iv, 0, p) ]*tc_ma_[m][p];
     }
   }
 #endif
@@ -668,11 +669,15 @@ __targetEntry__ void lb_collision_mrt_lattice(lb_t* t_lb,
 					      int nSites) {
   int baseIndex = 0;
 
-  __targetTLP__(baseIndex, nSites) {
+  //  __targetTLP__(baseIndex, nSites) {
+
+  for (baseIndex=0; baseIndex < tc_nSites; baseIndex +=VVL){
+#pragma omp task default(none) shared(t_lb, t_force, t_velocity, t_status, noise, noise_on) \
+  firstprivate(baseIndex)
     lb_collision_mrt_site(t_lb->f, t_force, t_velocity, t_status, noise,
 			  noise_on, baseIndex);
   }
-
+#pragma omp taskwait
 
   return;
 }
@@ -758,7 +763,9 @@ int lb_collision_mrt(lb_t * lb, hydro_t * hydro, map_t * map, noise_t * noise) {
   }
   lb_collision_mrt_lattice_fast __targetLaunch__(nSites) ( lb, hydro->t_f, hydro->t_u,nSites);
 #else
-  lb_collision_mrt_lattice __targetLaunch__(nSites) ( lb, hydro->t_f, hydro->t_u,map->t_status,noise,noise_on,nSites);
+  lb_collision_mrt_lattice __targetLaunch__(nSites) ( lb, hydro->t_f, 
+						      hydro->t_u,map->t_status,noise,
+						      noise_on,nSites);
 #endif
 
   targetSynchronize();
@@ -1162,40 +1169,12 @@ __targetEntry__ void lb_collision_binary_lattice( lb_t * t_lb,
 
   /* partition binary collision kernel across the lattice on the target */
 
-#ifdef TASKS
-  int i=0,BLOCK= 8;
-
-  //for(baseIndex=0;baseIndex < tc_nSites; baseIndex+=VVL){
-  /* lb_collision_binary_site(t_lb->f, t_force, t_velocity, t_phi, t_gradphi, */
-  /* 			 t_delsqphi, t_chemical_stress, */
-  /* 			 t_chemical_potential,noise,noise_on,baseIndex); */
-  
-  for(baseIndex=0;baseIndex < tc_nSites; baseIndex+=BLOCK){
-
-#pragma omp task default(none) private(i) firstprivate(baseIndex)	\
-  shared(t_lb, t_force, t_velocity, t_phi, t_gradphi, t_delsqphi,	\
-	 t_chemical_stress, t_chemical_potential, noise, noise_on,BLOCK) 
-    {
-    for (i=baseIndex;i < baseIndex + BLOCK; i+=VVL)
-      {
-	lb_collision_binary_site(t_lb->f, t_force, t_velocity, t_phi, t_gradphi,
-				 t_delsqphi, t_chemical_stress, t_chemical_potential,
-				 noise, noise_on, i);
-      }
-    }
-
-  }
-
-#pragma omp taskwait
-  
-#else
   __targetTLP__(baseIndex,tc_nSites){
     lb_collision_binary_site(t_lb->f, t_force, t_velocity, t_phi, t_gradphi,
 			     t_delsqphi, t_chemical_stress,
 			     t_chemical_potential,noise,noise_on,baseIndex);
-}
-#endif   
-  
+        
+  }
   
   return;
 }
@@ -3441,8 +3420,7 @@ __target__ void d3q19matmult2chunk(double* mode, double* fchunk, int baseIndex)
 }
 
 
- __target__ void updateDistD3Q19(double jdotc[3*VVL],double sphidotq[VVL],double sphi[3][3*VVL],
-				 double phi[VVL], double jphi[3*VVL], double* t_f, int baseIndex){
+ __target__ void updateDistD3Q19(double jdotc[3*VVL],double sphidotq[VVL],double sphi[3][3*VVL],double phi[VVL], double jphi[3*VVL], double* t_f, int baseIndex){
 
   int i, j, p, iv=0;
 

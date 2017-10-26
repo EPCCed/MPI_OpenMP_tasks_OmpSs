@@ -99,12 +99,12 @@ void field_free(field_t * obj) {
 
   if (obj->tcopy) {
 
-    //free data space on target
+    //free data space on target 
     double* tmpptr;
     field_t* t_obj = obj->tcopy;
-    copyFromTarget(&tmpptr,&(t_obj->data),sizeof(double*));
+    copyFromTarget(&tmpptr,&(t_obj->data),sizeof(double*)); 
     targetFree(tmpptr);
-
+    
     //free target copy of structure
     targetFree(obj->tcopy);
   }
@@ -148,7 +148,7 @@ int field_init(field_t * obj, int nhcomm) {
   double* tmpptr;
   field_t* t_obj = obj->tcopy;
   targetCalloc((void**) &tmpptr,obj->nf*nsites*sizeof(double));
-  copyToTarget(&(t_obj->data),&tmpptr,sizeof(double*));
+  copyToTarget(&(t_obj->data),&tmpptr,sizeof(double*)); 
 
   copyToTarget(&(t_obj->nf),&(obj->nf),sizeof(int)); //integer with number of field components
 
@@ -185,7 +185,7 @@ int field_nf(field_t * obj, int * nf) {
  *****************************************************************************/
 
 int field_init_io_info(field_t * obj, int grid[3], int form_in,
-                       int form_out) {
+			     int form_out) {
   assert(obj);
   assert(grid);
   assert(obj->info == NULL);
@@ -257,18 +257,18 @@ int field_leesedwards(field_t * obj) {
   int nlocal[3]; /* Local system size */
   int ib;        /* Index in buffer region */
   int ib0;       /* buffer region offset */
-  //int ic;        /* Index corresponding x location in real system */
+  int ic;        /* Index corresponding x location in real system */
   int jc, kc, n;
-  //int index, index0, index1, index2, index3;
+  int index, index0, index1, index2, index3;
 
-  //double dy;     /* Displacement for current ic->ib pair */
-  //double fr;     /* Fractional displacement */
+  double dy;     /* Displacement for current ic->ib pair */
+  double fr;     /* Fractional displacement */
   double t;      /* Time */
 
   const double r6 = (1.0/6.0);
 
-  //int jdy;               /* Integral part of displacement */
-  //int j0, j1, j2, j3;    /* j values in real system to interpolate between */
+  int jdy;               /* Integral part of displacement */
+  int j0, j1, j2, j3;    /* j values in real system to interpolate between */
 
   assert(obj);
   assert(obj->data);
@@ -291,42 +291,38 @@ int field_leesedwards(field_t * obj) {
 
     for (ib = 0; ib < le_get_nxbuffer(); ib++) {
 
-      //#pragma omp task default(none) private(jc,kc,n) shared(nlocal,nhalo,ib0,ib,nf,obj,t)
-      {
+      ic = le_index_buffer_to_real(ib);
+      dy = le_buffer_displacement(ib, t);
+      dy = fmod(dy, L(Y));
+      jdy = floor(dy);
+      fr  = 1.0 - (dy - jdy);
 
-        int ic = le_index_buffer_to_real(ib);
-        double dy = le_buffer_displacement(ib, t);
-        dy = fmod(dy, L(Y));
-        int jdy = floor(dy);
-        double fr  = 1.0 - (dy - jdy);
+      for (jc = 1 - nhalo; jc <= nlocal[Y] + nhalo; jc++) {
 
-        for (jc = 1 - nhalo; jc <= nlocal[Y] + nhalo; jc++) {
+        /* Note that a linear interpolation here would involve
+         * (1.0 - fr)*phi(ic,j1,kc) + fr*phi(ic,j2,kc)
+         * This is just Lagrange four-point instead. */
 
-          /* Note that a linear interpolation here would involve
-           * (1.0 - fr)*phi(ic,j1,kc) + fr*phi(ic,j2,kc)
-           * This is just Lagrange four-point instead. */
+        j0 = 1 + (jc - jdy - 3 + 2*nlocal[Y]) % nlocal[Y];
+        j1 = 1 + j0 % nlocal[Y];
+        j2 = 1 + j1 % nlocal[Y];
+        j3 = 1 + j2 % nlocal[Y];
 
-          int j0 = 1 + (jc - jdy - 3 + 2*nlocal[Y]) % nlocal[Y];
-          int j1 = 1 + j0 % nlocal[Y];
-          int j2 = 1 + j1 % nlocal[Y];
-          int j3 = 1 + j2 % nlocal[Y];
-
-          for (kc = 1 - nhalo; kc <= nlocal[Z] + nhalo; kc++) {
-            int index  = nf*le_site_index(ib0 + ib, jc, kc);
-            int index0 = nf*le_site_index(ic, j0, kc);
-            int index1 = nf*le_site_index(ic, j1, kc);
-            int index2 = nf*le_site_index(ic, j2, kc);
-            int index3 = nf*le_site_index(ic, j3, kc);
-            for (n = 0; n < nf; n++) {
-              obj->data[index + n] =
-                -  r6*fr*(fr-1.0)*(fr-2.0)*obj->data[index0 + n]
-                + 0.5*(fr*fr-1.0)*(fr-2.0)*obj->data[index1 + n]
-                - 0.5*fr*(fr+1.0)*(fr-2.0)*obj->data[index2 + n]
-                +        r6*fr*(fr*fr-1.0)*obj->data[index3 + n];
-            }
+        for (kc = 1 - nhalo; kc <= nlocal[Z] + nhalo; kc++) {
+          index  = nf*le_site_index(ib0 + ib, jc, kc);
+          index0 = nf*le_site_index(ic, j0, kc);
+          index1 = nf*le_site_index(ic, j1, kc);
+          index2 = nf*le_site_index(ic, j2, kc);
+          index3 = nf*le_site_index(ic, j3, kc);
+          for (n = 0; n < nf; n++) {
+            obj->data[index + n] =
+              -  r6*fr*(fr-1.0)*(fr-2.0)*obj->data[index0 + n]
+              + 0.5*(fr*fr-1.0)*(fr-2.0)*obj->data[index1 + n]
+              - 0.5*fr*(fr+1.0)*(fr-2.0)*obj->data[index2 + n]
+              +        r6*fr*(fr*fr-1.0)*obj->data[index3 + n];
           }
         }
-      }//tasks
+      }
     }
   }
 
@@ -784,7 +780,7 @@ static int field_write_ascii(FILE * fp, int index, void * self) {
   for (n = 0; n < obj->nf; n++) {
     nwrite = fprintf(fp, "%22.15e ", obj->data[obj->nf*index + n]);
     if (nwrite != 23) fatal("fprintf(%s) failed at index %d\n", obj->name,
-                            index);
+			    index);
   }
 
   nwrite = fprintf(fp, "\n");

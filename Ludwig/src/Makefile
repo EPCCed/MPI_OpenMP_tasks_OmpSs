@@ -1,50 +1,22 @@
-###############################################################################
-#
-# Makefile for LUDWIG
-#
-# Preprocessor flags.
-#
-# Please use the following for any production run
-#
-# -DNDEBUG               Switch off standard C assert()
-#                        The assertions can make the code much slower.
-#
-# make serial            for serial code (default model is D3Q19)
-# make mpi               for parallel code (default model is D3Q19)
-#
-# make serial-d2q9       etc for serial D2Q19or D3Q15 or D3Q19
-# make mpi-d2q9          etc for parallel ditto
-#
-# Compiler flags.
-#
-# Appropriate flags for your system should be set in the parent
-# directory in the file config.mk. See ../Makefile.mk
-#
-# Edinburgh Soft Matter and Statistical Physics Group and
-# Edinburgh Parallel Computing Centre
-#
-# Kevin Stratford (kevin@epcc.ed.ac.uk)
-# (c) 2010-2015 The University of Edinburgh
-#
-###############################################################################
 
 include ../Makefile.mk
 
 MAIN = main
-EXECUTABLE = LudwigTasks.exe
+EXECUTABLE = Ludwig.exe
 LIBRARY = libludwig.a
 
-OPTS = -DNP_D3Q6 -DTASKS
-LIBS = -L../targetDP -ltarget -lm
-INC = -I. -I ../targetDP
-CFLAGS = -qopenmp
+OPTS = -DNP_D3Q6
+LIBS = -L../targetDP -ltarget -lm -fopenmp
 
-ifeq ($(strip $(OPTION)),reveal_libgen)
- 	OPTS += -h pl=ludwiglib.pl
+ifeq ($(PE_ENV),GNU)
+LIBS+=-fopenmp
 endif
-ifeq ($(strip $(OPTION)),reveal_profgen)
-	OPTS += -h profile_generate
+ifeq ($(PE_ENV),INTEL)
+LIBS+=-qopenmp
 endif
+
+INC = -I. -I ../targetDP
+
 ###############################################################################
 #
 # Compilation with PETSc is enabled by setting HAVE_PETSC.
@@ -86,8 +58,7 @@ OBJS = \
      gradient_2d_5pt_fluid.o gradient_2d_tomita_fluid.o \
      gradient_3d_7pt_fluid.o gradient_3d_7pt_solid.o \
      gradient_3d_27pt_fluid.o gradient_3d_27pt_solid.o \
-     halo.o halo_tasks.o halo_unpack.o halo_utils.o hydro.o \
-     hydro_rt.o interaction.o io_harness.o \
+     hydro.o hydro_rt.o interaction.o io_harness.o \
      leslie_ericksen.o \
      lc_droplet.o lc_droplet_rt.o model.o model_le.o map.o \
      noise.o pair_lj_cut.o pair_ss_cut.o pair_yukawa.o \
@@ -107,7 +78,7 @@ OBJS = \
      stats_distribution.o stats_free_energy.o stats_rheology.o \
      stats_sigma.o stats_symmetric.o \
      stats_surfactant.o stats_turbulent.o stats_velocity.o svn.o \
-     symmetric.o timer.o unpack.o util.o wall.o wall_ss_cut.o comms_gpu.o ludwig.o
+     symmetric.o timer.o util.o wall.o wall_ss_cut.o comms_gpu.o ludwig.o
 
 
 ###############################################################################
@@ -131,7 +102,7 @@ verbose:
             "\t Check the Makefile for further details\n"	
 
 code:	$(MAIN).o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(EXECUTABLE) $(MAIN).o $(LIBRARY) $(LIBS)
+	$(CC) $(LDFLAGS) -o $(EXECUTABLE) $(MAIN).o $(LIBRARY) $(LIBS)
 
 # Serial versions
 
@@ -206,7 +177,7 @@ libmpi:
 # quoted, e.g. "1191", hence the apostrophe armageddon.
 
 svn.o:
-	$(CC) $(CFLAGS) -D SVN_REVISION='"'`svnversion`'"' -c svn.c
+	$(CC) $(CFLAGS) -D SVN_REVISION="hello" -c svn.c
 
 ###############################################################################
 #
