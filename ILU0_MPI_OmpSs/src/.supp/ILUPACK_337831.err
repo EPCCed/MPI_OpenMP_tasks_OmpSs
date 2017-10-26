@@ -1,0 +1,6 @@
+remove mkl/2017.4 (LD_LIBRARY_PATH) 
+remove impi/2017.4 (PATH, MANPATH, LD_LIBRARY_PATH) 
+Set INTEL compilers as MPI wrappers backend 
+Set INTEL compilers as MPI wrappers backend 
+load ompss/git (PATH): OmpSs git - nanox 0.14a, mcxx 2.1.0 
+load openmpi/1.10.4 (PATH, MANPATH, LD_LIBRARY_PATH) 
