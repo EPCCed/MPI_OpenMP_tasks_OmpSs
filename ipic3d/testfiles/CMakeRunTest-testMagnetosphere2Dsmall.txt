@@ -1,0 +1,37 @@
+#This release was prepared by Dana Akhmetova <danaak@kth.se>/<danieka@gmail.com> on behalf of the INTERTWinE European Exascale Project <http://www.intertwine-project.eu>
+####################################################
+#  testMagnetosphere2Dsmall test
+####################################################
+
+# ------------------
+# Configure the test
+# ------------------
+
+set(IPIC_testMagnetosphere2Dsmall_TEST_DIR "${IPIC_TESTS_DIR}/testMagnetosphere2Dsmall")
+file(MAKE_DIRECTORY "${IPIC_testMagnetosphere2Dsmall_TEST_DIR}")
+file(MAKE_DIRECTORY "${IPIC_testMagnetosphere2Dsmall_TEST_DIR}/data")
+
+configure_file("${IPIC_SOURCE_DIR}/inputfiles/testMagnetosphere2Dsmall.inp" "${IPIC_testMagnetosphere2Dsmall_TEST_DIR}")
+
+# ------------------
+# Launch the mpi run
+# ------------------
+
+execute_process(COMMAND ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 6 ${MPIEXEC_POSTFLAGS} ${IPICEXEC} testMagnetosphere2Dsmall.inp
+                WORKING_DIRECTORY ${IPIC_testMagnetosphere2Dsmall_TEST_DIR}
+                TIMEOUT 180)
+
+# -------------------------------------------------------------
+# Copy the reference solution and compare using a python script
+# -------------------------------------------------------------
+
+file(COPY ${IPIC_SOURCE_DIR}/testfiles/ConservedQuantities.txt-testMagnetosphere2Dsmall DESTINATION ${IPIC_testMagnetosphere2Dsmall_TEST_DIR}/data/)
+execute_process(COMMAND ${IPIC_SOURCE_DIR}/scripts/compareconserved -r ${IPIC_testMagnetosphere2Dsmall_TEST_DIR}/data/ConservedQuantities.txt-testMagnetosphere2Dsmall -f ${IPIC_testMagnetosphere2Dsmall_TEST_DIR}/data/ConservedQuantities.txt RESULT_VARIABLE ierr)
+
+# --------------------------------
+# Report the return value to ctest
+# --------------------------------
+
+if(NOT ${ierr} EQUAL 0)
+  message(FATAL_ERROR "testMagnetosphere2Dsmall TEST failed with error number ${ierr}.")
+endif()

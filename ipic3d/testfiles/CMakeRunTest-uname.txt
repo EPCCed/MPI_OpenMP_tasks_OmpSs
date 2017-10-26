@@ -1,0 +1,20 @@
+#This release was prepared by Dana Akhmetova <danaak@kth.se>/<danieka@gmail.com> on behalf of the INTERTWinE European Exascale Project <http://www.intertwine-project.eu>
+####################################################
+#  uname test
+####################################################
+
+# ---------------
+# Launch the test
+# ---------------
+
+execute_process(COMMAND uname -a
+                TIMEOUT 10
+                RESULT_VARIABLE ierr)
+
+# --------------------------------
+# Report the return value to ctest
+# --------------------------------
+
+if(NOT ${ierr} EQUAL 0)
+  message(FATAL_ERROR "GEM TEST failed with error number ${ierr}.")
+endif()

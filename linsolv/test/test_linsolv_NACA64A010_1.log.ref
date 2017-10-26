@@ -1,0 +1,39 @@
+[0] Number of threads: 4
+[0] Number of procs:   1
+[0] Read block sparse matrix
+[0] Read rhs
+[0] Number of sweeps: 5
+[0] Decompose matrix
+[0] Test solver 'Block point implicit'
+[0] Column checksums:
+[0]  col 0: -6.423188e+00
+[0]  col 1: 2.778967e+01
+[0]  col 2: -1.030543e-18
+[0]  col 3: 1.227871e-04
+[0]  col 4: -1.284003e+01
+[0]  col 5: 1.390551e-03
+[0] Test solver 'Block Jacobi'
+[0] Column checksums:
+[0]  col 0: -1.039735e+01
+[0]  col 1: 4.105795e+01
+[0]  col 2: -7.929666e-19
+[0]  col 3: 3.441901e-04
+[0]  col 4: -3.279221e+01
+[0]  col 5: 2.135221e-03
+[0] Test solver 'Block Gauss-Seidel'
+[0] Column checksums:
+[0]  col 0: -1.199529e+01
+[0]  col 1: 4.067713e+01
+[0]  col 2: -1.736175e-18
+[0]  col 3: 4.917547e-01
+[0]  col 4: -4.053566e+01
+[0]  col 5: 2.162179e-03
+[0] Test solver 'Block symmetric Gauss-Seidel'
+[0] Column checksums:
+[0]  col 0: -1.384785e+01
+[0]  col 1: 3.924335e+01
+[0]  col 2: -1.484876e-18
+[0]  col 3: 4.766804e-03
+[0]  col 4: -4.804875e+01
+[0]  col 5: 2.224383e-03
+[0] All done
