@@ -1,0 +1,29 @@
+--------------------------------------------------------------------------------
+linsolv - evaluation kernel containing some iterative solution methods
+          for block sparse linear systems from TAU
+--------------------------------------------------------------------------------
+
+Configuration:
+1. Copy/rename the file taudef.template to taudef
+2. Define local settings in file taudef 
+   (e.g. set the paths to MPI and NetCDF libraries)
+
+Compiling the kernel:
+1. Change to directory src/
+2. Call make (builds executable test_linsolv.exe)
+
+Running the NACA testcase:
+1. Change to directory data/NACA64A010/
+2. Sequential run:
+   ../../src/test_linsolv.exe
+3. Parallel run:
+   mpirun -np 4 ../../src/test_linsolv.exe
+
+Running automatic build and correctness tests:
+0. Preconditions:
+   taudef file is needed (see Configuration)
+1. Execute test script:
+   * without taskloop construct:
+     [mympirun=<path to mpirun or mpiexec>] [taskloop=0] test/run_tests.sh
+   * with taskloop construct:
+     [mympirun=<path to mpirun or mpiexec>] taskloop=1 test/run_tests.sh

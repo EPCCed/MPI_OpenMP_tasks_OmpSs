@@ -1,0 +1,22 @@
+################################################################################
+# Local definitions for compiling TAU-kernel linsolv
+################################################################################
+
+# C Compiler
+CC = gcc
+
+# enable/disable debug mode
+DEBUG_MODE = 0
+
+# NetCDF
+NETCDF_ROOT    = <path to NetCDF root directory>
+NETCDF_INCDIR  = $(NETCDF_ROOT)/include
+NETCDF_LIBDIR  = $(NETCDF_ROOT)/lib64
+NETCDF_LIBNAME = netcdf
+
+# MPI
+MPI_ROOT    = <path to MPI root directory>
+MPI_INCDIR  = $(MPI_ROOT)/include
+MPI_LIBDIR  = $(MPI_ROOT)/lib64
+MPI_LIBNAME = mpi
+USE_MPI_MULTI_THREADED = 0
