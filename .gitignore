@@ -50,3 +50,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# N-Body directory
+nbody/data/*
+nbody/obj/*
