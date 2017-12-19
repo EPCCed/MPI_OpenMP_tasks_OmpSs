@@ -12,6 +12,8 @@
 #define PART 1024
 #define PAGE_SIZE 4096
 
+#define TOLERATED_ERROR 0.0008
+
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define LOG2(a) (31-__builtin_clz((a)))

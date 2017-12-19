@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <mpi.h>
+#include <nanos6/debug.h>
 
 static void calculate_forces(forces_block_t *forces, const particles_block_t *block1, const particles_block_t *block2, const int num_blocks);
 static void update_particles(particles_block_t *particles, forces_block_t *forces, const int num_blocks, const float time_interval);
@@ -14,6 +15,12 @@ static void forward_particles(const particles_block_t *sendbuf, particles_block_
 static void calculate_forces_block(forces_block_t *forces, const particles_block_t *block1, const particles_block_t *block2);
 static void update_particles_block(particles_block_t *particles, forces_block_t *forces, const float time_interval);
 static void forward_particles_block(const particles_block_t *sendbuf, particles_block_t *recvbuf, int block_id, int rank, int rank_size);
+
+#ifdef INTEROPERABILITY
+int *serial = NULL;
+#else
+int *serial = (int *)1;
+#endif
 
 void nbody_solve(nbody_t *nbody, const int num_blocks, const int timesteps, const float time_interval)
 {
@@ -47,6 +54,7 @@ void nbody_solve(nbody_t *nbody, const int num_blocks, const int timesteps, cons
 		update_particles(local, forces, num_blocks, time_interval);
 	}
 	
+	#pragma oss taskwait
 	MPI_Barrier(MPI_COMM_WORLD);
 }
 
@@ -89,6 +97,7 @@ void forward_particles(const particles_block_t *sendbuf, particles_block_t *recv
 	}
 }
 
+#pragma oss task in(*block1, *block2) inout(*forces) label(calculate_forces_block)
 void calculate_forces_block(forces_block_t *forces, const particles_block_t *block1, const particles_block_t *block2)
 {
 	float *x = forces->x;
@@ -130,6 +139,7 @@ void calculate_forces_block(forces_block_t *forces, const particles_block_t *blo
 	}
 }
 
+#pragma oss task inout(*particles, *forces) label(update_particles_block)
 void update_particles_block(particles_block_t *particles, forces_block_t *forces, const float time_interval)
 {
 	for (int e = 0; e < BLOCK_SIZE; e++){
@@ -162,6 +172,7 @@ void update_particles_block(particles_block_t *particles, forces_block_t *forces
 	memset(forces, 0, sizeof(forces_block_t));
 }
 
+#pragma oss task in(*sendbuf) out(*recvbuf) inout(*serial) label(forward_particles_block)
 void forward_particles_block(const particles_block_t *sendbuf, particles_block_t *recvbuf, int block_id, int rank, int rank_size)
 {
 	int src = MOD(rank - 1, rank_size);
@@ -188,7 +199,7 @@ void nbody_stats(const nbody_t *nbody, const nbody_conf_t *conf, double time)
 		int total_particles = particles * rank_size;
 		
 		printf("bigo, %s, processes, %d, threads, %d, timesteps, %d, total_particles, %d, particles_per_proc, %d, block_size, %d, blocks_per_proc, %d, time, %g, performance, %g\n",
-			TOSTRING(BIGO), rank_size, 1, nbody->timesteps, total_particles, particles, BLOCK_SIZE,
+			TOSTRING(BIGO), rank_size, nanos_get_num_cpus(), nbody->timesteps, total_particles, particles, BLOCK_SIZE,
 			nbody->num_blocks, time, nbody_compute_throughput(total_particles, nbody->timesteps, time)
 		);
 	}

@@ -75,9 +75,17 @@ void nbody_check(const nbody_t *nbody)
 	particles_block_t *reference = mmap(NULL, nbody->file.size, PROT_READ, MAP_SHARED, fd, nbody->file.offset);
 	assert(reference != MAP_FAILED);
 	
-	int correct = nbody_compare_particles(nbody->local, reference, nbody->num_blocks);
-	if (correct && !rank) {
-		printf("Result validation: OK\n");
+	int correct, correct_chunk;
+	correct_chunk = nbody_compare_particles(nbody->local, reference, nbody->num_blocks);
+	
+	MPI_Reduce(&correct_chunk, &correct, 1, MPI_INT, MPI_LAND, 0, MPI_COMM_WORLD);
+	
+	if (!rank) {
+		if (correct) {
+			printf("Result validation: OK\n");
+		} else {
+			printf("Result validation: ERROR\n");
+		}
 	}
 	
 	int err = munmap(reference, nbody->file.size);

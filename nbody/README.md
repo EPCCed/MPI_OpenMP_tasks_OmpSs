@@ -20,12 +20,13 @@ binaries, by executing the `make` command. These versions can be blocking,
 when the particle space is divided into smaller blocks, or non-blocking, when 
 it is not. They are:
 
-  * **nbody_seq**: Sequential version (non-blocking).
-  * **nbody_seq_blocking**: Sequential version (blocking).
-  * **nbody_omp**: Parallel version using fork-join parallelism (non-blocking).
+  * **nbody_seq_plain**: Sequential version (non-blocking).
+  * **nbody_omp_plain**: Parallel version using fork-join parallelism (non-blocking).
+  * **nbody_seq**: Sequential version (blocking).
   * **nbody_ompss**: Parallel version using OmpSs tasks (blocking).
-  * **nbody_mpi**: Parallel version using OmpSs tasks + MPI (blocking). Communication tasks are serialized.
-  * **nbody_mpi_interop**: Parallel version using OmpSs tasks + MPI + Interoperability library (blocking). *See building instructions, step 1*.
+  * **nbody_mpi**: Parallel version using MPI (blocking).
+  * **nbody_mpi_ompss**: Parallel version using OmpSs tasks + MPI (blocking). Communication tasks are serialized.
+  * **nbody_mpi_ompss_interop**: Parallel version using OmpSs tasks + MPI + Interoperability library (blocking). *See building instructions, step 1*.
 
   The simplest way to compile this package is:
 
@@ -41,6 +42,11 @@ it is not. They are:
      the benchmark (by default 2048). Type `make BS=MY_BLOCK_SIZE`
      in order to change this value.
 
+  3. In addition, you can type 'make check' to check the correctness
+     of the built versions. By default, MPI versions run with 2 MPI
+     processes and 2 hardware threads for each process, but you can
+     change these parameters in 'scripts/run-tests.sh'.
+
 ## Execution instructions
 
 The binaries accept several options. The most relevant options are the number 
@@ -49,7 +55,7 @@ of total particles with `-p` (default: 16384), and the number of timesteps with
 of execution could be:
 
 ```
-$ mpiexec -n 4 -bind-to hwthread:16 nbody_mpi_interop.N2.1024.exe -t 100 -p 8192
+$ mpiexec -n 4 -bind-to hwthread:16 nbody_mpi_ompss.N2.1024.exe -t 100 -p 8192
 ```
 
 in which the application will perform 100 timesteps in 4 MPI processes with 16 

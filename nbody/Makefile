@@ -1,10 +1,10 @@
 # Compilers
 CC=gcc
-MPICC=mpicc
 MCC=mcc
+MPICC=mpicc
+MPI_WRAPPERS=I_MPI_CC=$(MCC) MPICH_CC=$(MCC) OMPI_CC=$(MCC)
 
 CPPFLAGS=
-CPPFLAGS_SMP=
 CFLAGS=
 MCCFLAGS=
 LDFLAGS=
@@ -13,63 +13,96 @@ LDFLAGS=
 BIGO?=N2
 BS?=2048
 
+# Interoperability flags
+INTEROP_FLAGS=$(INTEROPERABILITY_HOME)/lib/libmpiompss-interop.a
+
 # Preprocessor flags
 CPPFLAGS+=-Isrc -DBIGO=$(BIGO) -D_BIGO_$(BIGO) -DBLOCK_SIZE=$(BS)
 
 # Compiler flags
 CFLAGS+=-O3 -std=gnu11
-MCCFLAGS+=--ompss-v2 $(CFLAGS) --Wn,-O3,-std=gnu11
+MCCFLAGS+=--ompss-2 $(CFLAGS) --Wn,-O3,-std=gnu11
 
 # Linker flags
-LDFLAGS+=-lrt -lm
+LDFLAGS+=-lrt -lm -lstdc++
 
-# Compilation
-PROGNAME=$(BIGO).$(BS).exe
+SEQUENTIAL_PLAIN_SOURCES=  \
+	src/common/common.c    \
+	src/plain/utils.c      \
+	src/plain/solver_seq.c \
+	src/plain/main.c
 
-# Directories
-OBJDIR=obj/
+SEQUENTIAL_SOURCES=                    \
+	src/common/common.c                \
+	src/blocking/common/common_utils.c \
+	src/blocking/smp/utils.c           \
+	src/blocking/smp/solver_seq.c      \
+	src/blocking/smp/main.c
 
-all: makedir nbody_seq nbody_seq_blocking nbody_omp nbody_ompss nbody_mpi
+OPENMP_PLAIN_SOURCES=      \
+	src/common/common.c    \
+	src/plain/utils.c      \
+	src/plain/solver_omp.c \
+	src/plain/main.c
 
-nbody_seq: common/common.o plain/utils.o plain/solver_seq.o plain/main.o
-	$(CC) $(CFLAGS) -o $@.$(PROGNAME) $(addprefix $(OBJDIR),$^) $(LDFLAGS)
+OMPSS_SOURCES=                         \
+	src/common/common.c                \
+	src/blocking/common/common_utils.c \
+	src/blocking/smp/utils.c           \
+	src/blocking/smp/solver_ompss.c    \
+	src/blocking/smp/main.c
 
-nbody_seq_blocking: common/common.o blocking/common/utils.o blocking/smp/utils.o blocking/smp/solver_seq.o blocking/smp/main.o
-	$(CC) $(CFLAGS) -o $@.$(PROGNAME) $(addprefix $(OBJDIR),$^) $(LDFLAGS)
+MPI_SOURCES=                           \
+	src/common/common.c                \
+	src/blocking/common/common_utils.c \
+	src/blocking/mpi/utils.c           \
+	src/blocking/mpi/solver_mpi.c      \
+	src/blocking/mpi/main.c
 
-nbody_omp: common/common.o plain/utils.o plain/solver_omp.o plain/main.o
-	$(CC) -fopenmp $(CFLAGS) -o $@.$(PROGNAME) $(addprefix $(OBJDIR),$^) $(LDFLAGS)
+MPI_OMPSS_SOURCES=                      \
+	src/common/common.c                 \
+	src/blocking/common/common_utils.c  \
+	src/blocking/mpi/utils.c            \
+	src/blocking/mpi/solver_mpi_ompss.c \
+	src/blocking/mpi/main.c
 
-nbody_ompss: common/common.o blocking/common/utils.o blocking/smp/utils.o blocking/smp/solver_ompss.o blocking/smp/main.o
-	$(MCC) $(MCCFLAGS) -o $@.$(PROGNAME) $(addprefix $(OBJDIR),$^) $(LDFLAGS)
+PROGS= \
+	nbody_seq_plain.$(BIGO).exe       \
+	nbody_omp_plain.$(BIGO).exe       \
+	nbody_seq.$(BIGO).$(BS).exe       \
+	nbody_ompss.$(BIGO).$(BS).exe     \
+	nbody_mpi.$(BIGO).$(BS).exe       \
+	nbody_mpi_ompss.$(BIGO).$(BS).exe
 
-nbody_mpi: common/common.o blocking/common/utils.o blocking/mpi/utils.o blocking/mpi/solver_mpi.o blocking/mpi/main.o
-	I_MPI_CC=$(MCC) MPICH_CC=$(MCC) OMPI_CC=$(MCC) $(MPICC) $(MCCFLAGS) -o $@.$(PROGNAME) $(addprefix $(OBJDIR),$^) $(LDFLAGS)
+ifdef INTEROPERABILITY_HOME
+PROGS+=nbody_mpi_ompss_interop.$(BIGO).$(BS).exe
+endif
 
-common/%.o: src/common/%.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $(OBJDIR)$@ $^
+all: $(PROGS)
 
-plain/solver_omp.o: src/plain/solver_omp.c
-	$(CC) -fopenmp $(CPPFLAGS) $(CFLAGS) -c -o $(OBJDIR)$@ $^
+nbody_seq_plain.$(BIGO).exe: $(SEQUENTIAL_PLAIN_SOURCES)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-plain/%.o: src/plain/%.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $(OBJDIR)$@ $^
+nbody_omp_plain.$(BIGO).exe: $(OPENMP_PLAIN_SOURCES)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fopenmp -o $@ $^ $(LDFLAGS)
 
-blocking/smp/solver_ompss.o: src/blocking/smp/solver_ompss.c
-	$(MCC) $(CPPFLAGS) $(MCCFLAGS) -c -o $(OBJDIR)$@ $^
+nbody_seq.$(BIGO).$(BS).exe: $(SEQUENTIAL_SOURCES)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-blocking/smp/%.o: src/blocking/smp/%.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $(OBJDIR)$@ $^
+nbody_ompss.$(BIGO).$(BS).exe: $(OMPSS_SOURCES)
+	$(MCC) $(CPPFLAGS) $(MCCFLAGS) -o $@ $^ $(LDFLAGS)
 
-blocking/mpi/%.o: src/blocking/mpi/%.c
-	I_MPI_CC=$(MCC) MPICH_CC=$(MCC) OMPI_CC=$(MCC) $(MPICC) $(CPPFLAGS) $(MCCFLAGS) -c -o $(OBJDIR)$@ $^
+nbody_mpi.$(BIGO).$(BS).exe: $(MPI_SOURCES)
+	$(MPICC) $(CPPFLAGS) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-blocking/common/%.o: src/blocking/common/%.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $(OBJDIR)$@ $^
+nbody_mpi_ompss.$(BIGO).$(BS).exe: $(MPI_OMPSS_SOURCES)
+	$(MPI_WRAPPERS) $(MPICC) $(CPPFLAGS) $(MCCFLAGS) -o $@ $^ $(LDFLAGS)
 
-makedir:
-	mkdir -p obj/common obj/plain obj/blocking/common obj/blocking/smp obj/blocking/mpi
+nbody_mpi_ompss_interop.$(BIGO).$(BS).exe: $(MPI_OMPSS_SOURCES)
+	$(MPI_WRAPPERS) $(MPICC) -DINTEROPERABILITY $(CPPFLAGS) $(MCCFLAGS) -o $@ $^ $(LDFLAGS) $(INTEROP_FLAGS)
+
+check: all
+	@./scripts/run-tests.sh $(PROGS)
 
 clean:
 	rm -f *.o *.exe
-	rm -rf obj/

@@ -69,6 +69,8 @@ void nbody_check(const nbody_t *nbody)
 	
 	if (nbody_compare_particles(nbody->particles, reference, nbody->num_blocks)) {
 		printf("Result validation: OK\n");
+	} else {
+		printf("Result validation: ERROR\n");
 	}
 	
 	int err = munmap(reference, nbody->file.size);

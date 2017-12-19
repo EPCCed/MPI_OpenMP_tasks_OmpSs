@@ -43,8 +43,7 @@ int nbody_compare_particles(const particles_t *local, const particles_t *referen
 	}
 	
 	double relative_error = error / (3.0 * count);
-	if ((count * 100.0) / (num_particles) > 0.6 || relative_error >  0.000008) {
-		printf("Relative error[%d]: %f\n", count, relative_error);
+	if ((count * 100.0) / (num_particles) > 0.6 || relative_error > TOLERATED_ERROR) {
 		return 0;
 	}
 	return 1;
@@ -70,6 +69,8 @@ void nbody_check(const nbody_t *nbody)
 	
 	if (nbody_compare_particles(&nbody->particles, &reference, nbody->num_particles)) {
 		printf("Result validation: OK\n");
+	} else {
+		printf("Result validation: ERROR\n");
 	}
 	
 	int err = munmap(reference_addr, nbody->file.size);
