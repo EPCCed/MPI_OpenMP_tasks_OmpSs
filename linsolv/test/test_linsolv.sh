@@ -71,7 +71,7 @@ do
     continue
   fi
 
-  diffoutput=$(diff -I "\[0\] Active .* version: " ${reflog} ${testlog})
+  diffoutput=$(diff ${reflog} ${testlog})
   if [ $? -eq 0 ]; then
     echo " No differences"
   else

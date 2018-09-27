@@ -88,40 +88,68 @@ void exchange_matrix(const CommMap *comap, Matrix matrix)
   double **mat = matrix.m;
   const int ncommpartner = comap->ncommdomains;
   int *commpartner = comap->commpartner;
-  int i, j, col;
 
-  for(i = 0; i < ncommpartner; i++)
+# pragma omp taskgroup
   {
-    const int source = commpartner[i];
-    const int recvcount = comap->recvcount[source];
-
-    if(recvcount > 0)
-      MPI_Irecv(recvbuf[i], ncols * recvcount, MPI_DOUBLE, source, tag, comm,
-                request + i);
-  }
-
-  for(i = 0; i < ncommpartner; i++)
-  {
-    const int dest = commpartner[i];
-    const int sendcount = comap->sendcount[dest];
-
-    if(sendcount > 0)
+#ifdef USE_MPI_MULTI_THREADED
+#   pragma omp taskloop nogroup
+#else
+#   pragma omp task
+#endif
+    for(int i = 0; i < ncommpartner; i++)
     {
-      int *sendindex = comap->sendindex[dest];
+      const int source = commpartner[i];
+      const int recvcount = comap->recvcount[source];
 
-      /* copy data to sendbuffer */
-      for(j = 0; j < sendcount; j++)
-        for(col = 0; col < ncols; col++)
-          sendbuf[i][j * ncols + col] = mat[sendindex[j]][col];
-
-      MPI_Isend(sendbuf[i], ncols * sendcount, MPI_DOUBLE, dest, tag, comm,
-                request + nrequest + i);
+      if(recvcount > 0)
+        MPI_Irecv(recvbuf[i], ncols * recvcount, MPI_DOUBLE, source, tag, comm,
+                  request + i);
     }
-  }
 
+#   pragma omp taskloop
+    for(int i = 0; i < ncommpartner; i++)
+    {
+      const int dest = commpartner[i];
+      const int sendcount = comap->sendcount[dest];
+
+      if(sendcount > 0)
+      {
+        int *sendindex = comap->sendindex[dest];
+
+        /* copy data to sendbuffer */
+        for(int j = 0; j < sendcount; j++)
+          for(int col = 0; col < ncols; col++)
+            sendbuf[i][j * ncols + col] = mat[sendindex[j]][col];
+
+#ifdef USE_MPI_MULTI_THREADED
+        MPI_Isend(sendbuf[i], ncols * sendcount, MPI_DOUBLE, dest, tag, comm,
+                  request + nrequest + i);
+#endif
+      }
+    } /* end taskloop */
+
+#ifndef USE_MPI_MULTI_THREADED
+    /* wait also for recv */
+#   pragma omp taskwait
+#   pragma omp task
+    for(int i = 0; i < ncommpartner; i++)
+    {
+      const int dest = commpartner[i];
+      const int sendcount = comap->sendcount[dest];
+
+      if(sendcount > 0)
+        MPI_Isend(sendbuf[i], ncols * sendcount, MPI_DOUBLE, dest, tag, comm,
+                  request + nrequest + i);
+    }
+#endif
+  } /* end taskgroup */
+
+# pragma omp task
   MPI_Waitall(2 * nrequest, request, status);
+# pragma omp taskwait
 
-  for(i = 0; i < ncommpartner; i++)
+# pragma omp taskloop
+  for(int i = 0; i < ncommpartner; i++)
   {
     const int source = commpartner[i];
     const int recvcount = comap->recvcount[source];
@@ -131,8 +159,8 @@ void exchange_matrix(const CommMap *comap, Matrix matrix)
       int *recvindex = comap->recvindex[source];
 
       /* copy data from recvbuffer */
-      for(j = 0; j < recvcount; j++)
-        for(col = 0; col < ncols; col++)
+      for(int j = 0; j < recvcount; j++)
+        for(int col = 0; col < ncols; col++)
           mat[recvindex[j]][col] = recvbuf[i][j * ncols + col];
     }
   }

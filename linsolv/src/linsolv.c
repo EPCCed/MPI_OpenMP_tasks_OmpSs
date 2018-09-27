@@ -532,6 +532,8 @@ static void gauss_seidel(BSMLinSys *linsys, CommMap *parallel_data, Matrix x0,
       } while(iter < max_iter);
     } /* end single */
   } /* end of parallel region */
+
+  deleteMatrix(help);
 } /* gauss_seidel() */
 #endif /* USE_TASKLOOP == 0 */
 
@@ -633,6 +635,8 @@ static void gauss_seidel(BSMLinSys *linsys, CommMap *parallel_data, Matrix x0,
       } while(iter < max_iter);
     } /* end single */
   } /* end of parallel region */
+
+  deleteMatrix(help);
 } /* gauss_seidel() */
 #endif /* USE_TASKLOOP == 1 */
 
@@ -805,6 +809,8 @@ static void symm_gauss_seidel(BSMLinSys *linsys, CommMap *parallel_data,
       } while(iter < max_iter);
     } /* end single */
   } /* end of parallel region */
+
+  deleteMatrix(help);
 } /* symm_gauss_seidel() */
 #endif /* USE_TASKLOOP == 0 */
 
@@ -963,5 +969,7 @@ static void symm_gauss_seidel(BSMLinSys *linsys, CommMap *parallel_data,
       } while(iter < max_iter);
     } /* end single */
   } /* end of parallel region */
+
+  deleteMatrix(help);
 } /* symm_gauss_seidel() */
 #endif /* USE_TASKLOOP == 1 */

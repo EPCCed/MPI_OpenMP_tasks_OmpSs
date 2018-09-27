@@ -28,6 +28,7 @@ LIBRARY_DIRS += $(MPI_LIBDIR)
 
 LDFLAGS += $(addprefix -L,$(LIBRARY_DIRS))
 CFLAGS += $(addprefix -I,$(INCLUDE_DIRS))
+CFLAGS += -fopenmp
 
 OBJ += exchange_matrix
 OBJ += matrix
@@ -46,10 +47,7 @@ LIB += m
 default: test_linsolv.exe
 
 %linsolv.exe: %linsolv.o $(addsuffix .o, $(OBJ))
-	$(CC) $(CFLAGS) -fopenmp -o $@ $^ $(LDFLAGS) $(addprefix -l, $(LIB))
-
-linsolv.o: CFLAGS += -fopenmp
-%linsolv.o: CFLAGS += -fopenmp
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(addprefix -l, $(LIB))
 
 .INTERMEDIATE: linsolv.o
 

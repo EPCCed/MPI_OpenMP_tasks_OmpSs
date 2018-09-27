@@ -62,6 +62,15 @@ int main(int argc, char *argv[])
     }
   }
 
+  /* print task version infos */
+  if(DBG_PRINT)
+  {
+    printf("[%d] Active task version: %s\n", myrank, TASKVERSION);
+
+    if(USE_TASKLOOP == 0)
+      printf("[%d]  used chunksize: %d\n", myrank, SET_CHUNKSIZE);
+  }
+
   /* read and calc communication data only in parallel case */
   if(nprocs > 1)
   {
@@ -120,16 +129,6 @@ int main(int argc, char *argv[])
 
   Matrix soln = generateMatrix(rhs.rows, rhs.cols);
 
-  /* print task version infos */
-  if(DBG_PRINT || myrank == 0)
-  {
-    printf("[%d] Active task version: %s\n", myrank, TASKVERSION);
-  }
-  if(DBG_PRINT && USE_TASKLOOP == 0)
-  {
-    printf("[%d]  used chunksize: %d\n", myrank, SET_CHUNKSIZE);
-  }
-
   if(DBG_PRINT || myrank == 0)
     printf("[%d] Number of sweeps: %d\n", myrank, num_sweeps);
 
@@ -142,6 +141,8 @@ int main(int argc, char *argv[])
   for(int i = 0; i < nsolver; i++)
   {
     BSLinSysMethod lin_solver = solverIDs[i];
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     if(DBG_PRINT || myrank == 0)
       printf("[%d] Test solver '%s'\n", myrank, get_linsolv_name(lin_solver));

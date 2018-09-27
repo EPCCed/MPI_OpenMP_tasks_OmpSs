@@ -12,9 +12,6 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define ABS(a) ((a) < 0 ? -1 * (a) : (a))
-/* check for close enough equality of doubles using relative difference */
-#define EQ(a,b) (ABS((a) - (b)) <= (DBL_EPSILON * MAX(ABS(a), ABS(b))) ? 1 : 0)
 
 #if defined(DEBUG)
 #  define DBG_MSG printf

@@ -36,7 +36,7 @@ void *check_malloc(size_t bytes)
 void *check_calloc(size_t number, size_t bytes)
 {
   if(number <= (size_t) 0 || bytes <= (size_t) 0)
-	return NULL;
+    return NULL;
 
   void *tmp = calloc(number, bytes);
   CHECK(tmp != NULL);
@@ -52,7 +52,7 @@ void *check_realloc(void *old, size_t bytes)
 
   if(bytes <= (size_t) 0)
   {
-	check_free(old);
+    check_free(old);
     return NULL;
   }
 
