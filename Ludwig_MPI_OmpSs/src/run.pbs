@@ -1,0 +1,20 @@
+#!/bin/bash --login
+#PBS -l place=excl
+#PBS -N test
+#PBS -l select=2:ncpus=72
+#PBS -l walltime=00:20:00
+#PBS -A z04
+ 
+cd $PBS_O_WORKDIR
+
+# Modules for MPI jobs
+module load intel-mpi-17
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lustre/home/z04/lcebaman/ompss/lib
+# Show detailed task placement info
+
+export OMP_NUM_THREADS=2
+export I_MPI_PIN_DOMAIN=omp
+
+export NX_ARGS="--smp-workers=2 " 
+mpirun -n 36 -ppn 18 ./Ludwig.exe ./input72 > 72_cores
+
