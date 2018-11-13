@@ -1,0 +1,543 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                          S u m m a r y   R e p o r t
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Compilation
+-----------
+File     : /home1/z01/z01/lcebaman/Ludwig/msc_nonblock/targetDP/targetDP_C.c
+Compiled : 2017-07-18  10:29:58
+Compiler : Version 8.4.1
+Ftnlx    : Version 8412 (libcif 84005)
+Target   : x86-64
+Command  : driver.cc -h cpu=ivybridge -h static -D __CRAYXC -D __CRAY_IVYBRIDGE
+           -D __CRAYXT_COMPUTE_LINUX_TARGET -h network=aries -O 2 -h list=m
+           -h msglevel_3 -h stdc -c targetDP_C.c
+           -W l,--rpath=/opt/cray/cce/8.4.1/craylibs/x86-64
+           -ibase-compiler /opt/cray/cce/8.4.1/CC/x86-64/compiler_include_base
+           -isystem /opt/cray/cce/8.4.1/craylibs/x86-64/include
+           -I /opt/gcc/4.8.1/snos/lib/gcc/x86_64-suse-linux/4.8.1/include
+           -I /opt/gcc/4.8.1/snos/lib/gcc/x86_64-suse-linux/4.8.1/include-fixed
+           -I /opt/cray/mpt/7.2.6/gni/mpich-cray/8.3/include
+           -I /opt/cray/libsci/13.2.0/CRAY/8.3/x86_64/include
+           -I /opt/cray/rca/1.0.0-2.0502.60530.1.62.ari/include
+           -I /opt/cray/alps/5.2.4-2.0502.9774.31.11.ari/include
+           -I /opt/cray/xpmem/0.1-2.0502.64982.5.3.ari/include
+           -I /opt/cray/gni-headers/4.0-1.0502.10859.7.8.ari/include
+           -I /opt/cray/dmapp/7.0.1-1.0502.11080.8.76.ari/include
+           -I /opt/cray/pmi/5.0.7-1.0000.10678.155.25.ari/include
+           -I /opt/cray/ugni/6.0-1.0502.10863.8.29.ari/include
+           -I /opt/cray/udreg/2.3.2-1.0502.10518.2.17.ari/include
+           -I /opt/cray/cce/8.4.1/craylibs/x86-64/pkgconfig/../include
+           -I /opt/cray/cce/8.4.1/craylibs/x86-64/include
+           -I /opt/cray/wlm_detect/1.0-1.0502.64649.2.1.ari/include
+           -I /opt/cray/krca/1.0.0-2.0502.63139.4.31.ari/include
+           -I /opt/cray-hss-devel/7.2.0/include
+
+clx report
+------------
+Source   : /home1/z01/z01/lcebaman/Ludwig/msc_nonblock/targetDP/targetDP_C.c
+Date     : 07/18/2017  10:29:59
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                          S o u r c e   L i s t i n g
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+     %%%    L o o p m a r k   L e g e n d    %%%
+
+     Primary Loop Type        Modifiers
+     ------- ---- ----        ---------
+     A - Pattern matched      a - atomic memory operation
+                              b - blocked
+     C - Collapsed            c - conditional and/or computed
+     D - Deleted               
+     E - Cloned                
+     F - Flat - No calls      f - fused
+     G - Accelerated          g - partitioned
+     I - Inlined              i - interchanged
+     M - Multithreaded        m - partitioned
+                              n - non-blocking remote transfer
+                              p - partial
+                              r - unrolled
+                              s - shortloop
+     V - Vectorized           w - unwound
+
+     + - More messages listed at end of listing
+     ------------------------------------------
+
+
+    1.              /*
+    2.               * targetDP_C.c: API Implementation for targetDP: C version
+    3.               * Alan Gray
+    4.               *
+    5.               * Copyright 2015 The University of Edinburgh
+    6.               *
+    7.               * Licensed under the Apache License, Version 2.0 (the "License");
+    8.               * you may not use this file except in compliance with the License.
+    9.               * You may obtain a copy of the License at
+   10.               *
+   11.               * http://www.apache.org/licenses/LICENSE-2.0
+   12.               *
+   13.               * Unless required by applicable law or agreed to in writing, software
+   14.               * distributed under the License is distributed on an "AS IS" BASIS,
+   15.               * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   16.               * See the License for the specific language governing permissions and
+   17.               * limitations under the License. 
+   18.               */
+   19.              
+   20.              
+   21.              #include <stdio.h>
+   22.              #include <stdlib.h>
+   23.              #include <string.h>
+   24.              #include <math.h>
+   25.              #include "targetDP.h"
+   26.              
+   27.              
+   28.              
+   29.              //The targetMalloc function allocates memory on the target.
+   30.              void targetMalloc(void **address_of_ptr,size_t size){
+   31.              
+   32.                void* ptr;
+   33.                ptr = malloc(size);
+   34.              
+   35.                if(!ptr){
+   36.                  printf("malloc failed\n");
+   37.  +               exit(1);
+   38.                }
+   39.                  
+   40.              
+   41.                *address_of_ptr=ptr;
+   42.              
+   43.              
+   44.              
+   45.                return;
+   46.                
+   47.              }
+   48.              
+   49.              //The targetCalloc function allocates, and initialises to zero, memory on the target.
+   50.              void targetCalloc(void **address_of_ptr,size_t size){
+   51.              
+   52.                void* ptr;
+   53.                ptr = calloc(1,size);
+   54.              
+   55.                if(!ptr){
+   56.                  printf("calloc failed\n");
+   57.  +               exit(1);
+   58.                }
+   59.                  
+   60.              
+   61.                *address_of_ptr=ptr;
+   62.              
+   63.              
+   64.              
+   65.                return;
+   66.                
+   67.              }
+   68.              
+   69.              
+   70.              // The targetMalloc function allocates unified memory that can be accessed
+   71.              // on the host or the target.
+   72.              void targetMallocUnified(void **address_of_ptr,size_t size){
+   73.              
+   74.                void* ptr;
+   75.                ptr = malloc(size);
+   76.              
+   77.                if(!ptr){
+   78.                  printf("malloc failed\n");
+   79.  +               exit(1);
+   80.                }
+   81.                  
+   82.              
+   83.                *address_of_ptr=ptr;
+   84.              
+   85.              
+   86.              
+   87.                return;
+   88.                
+   89.              }
+   90.              
+   91.              // The targetCalloc function allocates unified memory that can be accessed
+   92.              // on the host or the target, and is initialised to 0
+   93.              void targetCallocUnified(void **address_of_ptr,size_t size){
+   94.              
+   95.                void* ptr;
+   96.                ptr = calloc(1,size);
+   97.              
+   98.                if(!ptr){
+   99.                  printf("calloc failed\n");
+  100.  +               exit(1);
+  101.                }
+  102.                  
+  103.              
+  104.                *address_of_ptr=ptr;
+  105.              
+  106.              
+  107.                return;
+  108.                
+  109.              }
+  110.              
+  111.              void targetMallocHost(void **address_of_ptr,size_t size){
+  112.              
+  113.  +             targetMalloc(address_of_ptr,size);
+  114.              
+  115.                return;
+  116.              
+  117.              }
+  118.              
+  119.              //The targetFree function deallocates memory on the target.
+  120.              void targetFree(void *ptr){
+  121.                
+  122.                free(ptr);
+  123.                return;
+  124.                
+  125.              }
+  126.              
+  127.              
+  128.              //The copyToTarget function copies data from the host to the target.
+  129.              void copyToTarget(void *targetData,const void* data,const size_t size){
+  130.              
+  131.                memcpy(targetData,data,size);
+  132.                return;
+  133.              
+  134.              }
+  135.              
+  136.              //The copyFromTarget function copies data from the target to the host.
+  137.              void copyFromTarget(void *data,const void* targetData,const size_t size){
+  138.              
+  139.                memcpy(data,targetData,size);
+  140.                return;
+  141.              
+  142.              }
+  143.              
+  144.              // The targetInit3D initialises the environment required to perform any of the
+  145.              // “3D” operations defined below.
+  146.              void targetInit3D(int extents[3], size_t nfieldsmax, int nhalo){
+  147.                return;
+  148.              }
+  149.              
+  150.              //deprecated
+  151.              void targetInit(int extents[3], size_t nfieldsmax, int nhalo){
+  152.                return;
+  153.              }
+  154.              
+  155.              
+  156.              
+  157.              // The targetFinalize3D finalises the targetDP 3D environment.
+  158.              void targetFinalize3D(){
+  159.                return;
+  160.              }
+  161.              
+  162.              // deprecated
+  163.              void targetFinalize(){
+  164.                return;
+  165.              }
+  166.              
+  167.              
+  168.              void copyToTargetMasked(double *targetData,const double* data,const size_t nsites,
+  169.              			const size_t nfields,char* siteMask){
+  170.              
+  171.                int i,j;
+  172.  + 1-------<   for (i=0;i<nfields;i++){
+  173.  + 1 2-----<     for (j=0;j<nsites;j++){
+  174.    1 2             if(siteMask[j]) targetData[i*nsites+j]=data[i*nsites+j];
+  175.    1 2----->     }
+  176.    1------->   }
+  177.                return;
+  178.                
+  179.              }
+  180.              
+  181.              //
+  182.              void copyToTargetMaskedAoS(double *targetData,const double* data,const size_t nsites,
+  183.              			const size_t nfields,char* siteMask){
+  184.              
+  185.                int i,j;
+  186.  + 1-------<   for (j=0;j<nsites;j++){
+  187.    1             if(siteMask[j]){
+  188.    1 Vcr2--<       for (i=0;i<nfields;i++){
+  189.    1 Vcr2    	targetData[j*nfields+i]=data[j*nfields+i];
+  190.    1 Vcr2-->       }
+  191.    1             }
+  192.    1------->   }
+  193.              
+  194.                return;
+  195.                
+  196.              }
+  197.              
+  198.              void copyFromTargetMasked(double *data,const double* targetData,const size_t nsites,
+  199.              			const size_t nfields,char* siteMask){
+  200.              
+  201.                int i, j;
+  202.  + 1-------<   for (i=0;i<nfields;i++){
+  203.  + 1 2-----<     for (j=0;j<nsites;j++){
+  204.    1 2              if(siteMask[j]) data[i*nsites+j]=targetData[i*nsites+j];
+  205.    1 2----->     }
+  206.    1------->   }
+  207.                return;
+  208.              
+  209.              }
+  210.              
+  211.              //
+  212.              void copyFromTargetMaskedAoS(double *data,const double* targetData,const size_t nsites,
+  213.              			const size_t nfields,char* siteMask){
+  214.              
+  215.                int i, j;
+  216.  + 1-------<   for (j=0;j<nsites;j++){
+  217.    1             if(siteMask[j]){
+  218.    1 Vcr2--<       for (i=0;i<nfields;i++){
+  219.    1 Vcr2    	data[j*nfields+i]=targetData[j*nfields+i];
+  220.    1 Vcr2-->       }
+  221.    1             }
+  222.    1------->   }
+  223.                return;
+  224.                  
+  225.              }
+  226.              
+  227.              // The targetSynchronize function is used to block until 
+  228.              // the preceding __targetLaunch__ has completed.
+  229.              void targetSynchronize(){
+  230.                return;
+  231.              }
+  232.              
+  233.              
+  234.              //
+  235.              void targetZero(double* array,size_t size){
+  236.              
+  237.                int i;
+  238.              
+  239.                //#ifdef _OPENMP
+  240.                //#pragma omp parallel for 
+  241.                //#endif
+  242.    A-------<   for(i=0;i<size;i++){
+  243.    A             
+  244.    A             array[i]=0.;
+  245.    A             
+  246.    A------->   }
+  247.              
+  248.              }
+  249.              
+  250.              
+  251.              void targetSetConstant(double* array,double value,size_t size){
+  252.              
+  253.                int i;
+  254.              
+  255.                //#ifdef _OPENMP
+  256.                //#pragma omp parallel for 
+  257.                //#endif
+  258.    A-------<   for(i=0;i<size;i++){
+  259.    A             
+  260.    A             array[i]=value;
+  261.    A             
+  262.    A------->   }
+  263.              
+  264.              }
+  265.              
+  266.              
+  267.              __targetHost__ void targetAoS2SoA(double* array, size_t nsites, size_t nfields)
+  268.              {
+  269.                
+  270.                int i,k;
+  271.                double* tmpbuf = (double*) malloc(nsites*nfields*sizeof(double));
+  272.                double* tmpbuf2 = (double*) malloc(nsites*nfields*sizeof(double));
+  273.     I          copyFromTarget(tmpbuf,array,nsites*nfields*sizeof(double));	  
+  274.  + 1-------<   for(i=0;i<nsites;i++){
+  275.  + 1 r4----<     for(k=0;k<nfields;k++){
+  276.    1 r4            //tmpbuf2[i*nfields+k]=tmpbuf[k*nsites+i];
+  277.    1 r4            tmpbuf2[k*nsites+i]=tmpbuf[i*nfields+k];
+  278.    1 r4---->     }
+  279.    1------->   }
+  280.     I          copyToTarget(array,tmpbuf2,nsites*nfields*sizeof(double));	  
+  281.                free(tmpbuf);
+  282.                free(tmpbuf2);
+  283.              }
+  284.              
+  285.              __targetHost__ void targetSoA2AoS(double* array, size_t nsites, size_t nfields)
+  286.              {
+  287.                
+  288.                int i,k;
+  289.                double* tmpbuf = (double*) malloc(nsites*nfields*sizeof(double));
+  290.                double* tmpbuf2 = (double*) malloc(nsites*nfields*sizeof(double));
+  291.     I          copyFromTarget(tmpbuf,array,nsites*nfields*sizeof(double));	  
+  292.  + 1-------<   for(i=0;i<nsites;i++){
+  293.  + 1 r4----<     for(k=0;k<nfields;k++){
+  294.    1 r4            tmpbuf2[i*nfields+k]=tmpbuf[k*nsites+i];
+  295.    1 r4            //tmpbuf2[k*nsites+i]=tmpbuf[i*nfields+k];
+  296.    1 r4---->     }
+  297.    1------->   }
+  298.     I          copyToTarget(array,tmpbuf2,nsites*nfields*sizeof(double));	  
+  299.                free(tmpbuf);
+  300.                free(tmpbuf2);
+  301.              }
+  302.              
+  303.              //
+  304.              void checkTargetError(const char *msg){
+  305.              
+  306.                return;
+  307.              
+  308.              }
+  309.              
+  310.              
+  311.              __targetHost__ void copyDeepDoubleArrayToTarget(void* targetObjectAddress,
+  312.              						void* hostObjectAddress,
+  313.              						void* hostComponentAddress,
+  314.              						int size)
+  315.              {
+  316.              
+  317.                //calculate the offset between the object start and the component of interest
+  318.                long int offset=((char*)hostComponentAddress)-((char*)hostObjectAddress);
+  319.              
+  320.                //calculate the position of this component on the target
+  321.                char* targetComponentAddress=((char*)targetObjectAddress)+offset;
+  322.              
+  323.                //get a copy of this component pointer on the target
+  324.                void* tmpptr;
+  325.     I          copyFromTarget(&tmpptr,targetComponentAddress,sizeof(double*)); 
+  326.              
+  327.                //copy the deep array 
+  328.                void** ptrToHostComponent= (void**) hostComponentAddress;
+  329.     I          copyToTarget(tmpptr,*ptrToHostComponent,size*sizeof(double));
+  330.              
+  331.              
+  332.              }
+  333.              
+  334.              
+  335.              __targetHost__ void copyDeepDoubleArrayFromTarget(void* hostObjectAddress,
+  336.              						  void* targetObjectAddress,
+  337.              						  void* hostComponentAddress,
+  338.              						  int size)
+  339.              {
+  340.              
+  341.                //calculate the offset between the object start and the component of interest
+  342.                long int offset=((char*)hostComponentAddress)-((char*)hostObjectAddress);
+  343.              
+  344.                //calculate the position of this component on the target
+  345.                char* targetComponentAddress=((char*)targetObjectAddress)+offset;
+  346.              
+  347.                //get a copy of this component pointer on the target
+  348.                void* tmpptr;
+  349.     I          copyFromTarget(&tmpptr,targetComponentAddress,sizeof(double*)); 
+  350.              
+  351.                //copy the deep array 
+  352.                void** ptrToHostComponent= (void**) hostComponentAddress;
+  353.     I          copyFromTarget(*ptrToHostComponent,tmpptr,size*sizeof(double));
+  354.              
+  355.              
+  356.              }
+  357.              
+  358.              double targetDoubleSum(double* array, size_t size){
+  359.              
+  360.                int i;
+  361.              
+  362.                double result=0.;
+  363.              
+  364.                //#ifdef _OPENMP
+  365.                //#pragma omp parallel for reduction(+:result)
+  366.                //#endif
+  367.    Vr4-----<   for (i=0;i<size;i++)
+  368.    Vr4----->     result+=array[i];
+  369.              
+  370.                return result;
+  371.              }
+
+CC-3021 CC: IPA File = targetDP_C.c, Line = 37 
+  "exit" (called from "targetMalloc") was not inlined because the compiler was unable to locate the routine.
+
+CC-3021 CC: IPA File = targetDP_C.c, Line = 57 
+  "exit" (called from "targetCalloc") was not inlined because the compiler was unable to locate the routine.
+
+CC-3021 CC: IPA File = targetDP_C.c, Line = 79 
+  "exit" (called from "targetMallocUnified") was not inlined because the compiler was unable to locate the routine.
+
+CC-3021 CC: IPA File = targetDP_C.c, Line = 100 
+  "exit" (called from "targetCallocUnified") was not inlined because the compiler was unable to locate the routine.
+
+CC-3118 CC: IPA File = targetDP_C.c, Line = 113 
+  "targetMalloc" (called from "targetMallocHost") was not inlined because the call site will not flatten.  "exit" is missing.
+
+CC-6294 CC: VECTOR File = targetDP_C.c, Line = 172 
+  A loop was not vectorized because a better candidate was found at line 173.
+
+CC-6290 CC: VECTOR File = targetDP_C.c, Line = 173 
+  A loop was not vectorized because a recurrence was found between "data" and "targetData" at line 174.
+
+CC-6294 CC: VECTOR File = targetDP_C.c, Line = 186 
+  A loop was not vectorized because a better candidate was found at line 188.
+
+CC-6005 CC: SCALAR File = targetDP_C.c, Line = 188 
+  A loop was unrolled 2 times.
+
+CC-6213 CC: VECTOR File = targetDP_C.c, Line = 188 
+  A loop was conditionally vectorized.
+
+CC-6294 CC: VECTOR File = targetDP_C.c, Line = 202 
+  A loop was not vectorized because a better candidate was found at line 203.
+
+CC-6290 CC: VECTOR File = targetDP_C.c, Line = 203 
+  A loop was not vectorized because a recurrence was found between "targetData" and "data" at line 204.
+
+CC-6294 CC: VECTOR File = targetDP_C.c, Line = 216 
+  A loop was not vectorized because a better candidate was found at line 218.
+
+CC-6005 CC: SCALAR File = targetDP_C.c, Line = 218 
+  A loop was unrolled 2 times.
+
+CC-6213 CC: VECTOR File = targetDP_C.c, Line = 218 
+  A loop was conditionally vectorized.
+
+CC-6202 CC: VECTOR File = targetDP_C.c, Line = 242 
+  A loop was replaced by a library call.
+
+CC-6202 CC: VECTOR File = targetDP_C.c, Line = 258 
+  A loop was replaced by a library call.
+
+CC-3001 CC: IPA File = targetDP_C.c, Line = 273 
+  The call to tiny leaf routine "copyFromTarget" was textually inlined.
+
+CC-6290 CC: VECTOR File = targetDP_C.c, Line = 274 
+  A loop was not vectorized because a recurrence was found between "tmpbuf" and "tmpbuf2" at line 277.
+
+CC-6005 CC: SCALAR File = targetDP_C.c, Line = 275 
+  A loop was unrolled 4 times.
+
+CC-6290 CC: VECTOR File = targetDP_C.c, Line = 275 
+  A loop was not vectorized because a recurrence was found between "tmpbuf" and "tmpbuf2" at line 277.
+
+CC-3001 CC: IPA File = targetDP_C.c, Line = 280 
+  The call to tiny leaf routine "copyToTarget" was textually inlined.
+
+CC-3001 CC: IPA File = targetDP_C.c, Line = 291 
+  The call to tiny leaf routine "copyFromTarget" was textually inlined.
+
+CC-6290 CC: VECTOR File = targetDP_C.c, Line = 292 
+  A loop was not vectorized because a recurrence was found between "tmpbuf" and "tmpbuf2" at line 294.
+
+CC-6005 CC: SCALAR File = targetDP_C.c, Line = 293 
+  A loop was unrolled 4 times.
+
+CC-6290 CC: VECTOR File = targetDP_C.c, Line = 293 
+  A loop was not vectorized because a recurrence was found between "tmpbuf" and "tmpbuf2" at line 294.
+
+CC-3001 CC: IPA File = targetDP_C.c, Line = 298 
+  The call to tiny leaf routine "copyToTarget" was textually inlined.
+
+CC-3001 CC: IPA File = targetDP_C.c, Line = 325 
+  The call to tiny leaf routine "copyFromTarget" was textually inlined.
+
+CC-3001 CC: IPA File = targetDP_C.c, Line = 329 
+  The call to tiny leaf routine "copyToTarget" was textually inlined.
+
+CC-3001 CC: IPA File = targetDP_C.c, Line = 349 
+  The call to tiny leaf routine "copyFromTarget" was textually inlined.
+
+CC-3001 CC: IPA File = targetDP_C.c, Line = 353 
+  The call to tiny leaf routine "copyFromTarget" was textually inlined.
+
+CC-6005 CC: SCALAR File = targetDP_C.c, Line = 367 
+  A loop was unrolled 4 times.
+
+CC-6204 CC: VECTOR File = targetDP_C.c, Line = 367 
+  A loop was vectorized.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
